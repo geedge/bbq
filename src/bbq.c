@@ -1,15 +1,15 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-20 16:33:24
+ * @LastEditTime: 2024-05-20 18:14:06
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
-#include <stdio.h>
 #include "bbq.h"
+#include <stdio.h>
 
-int block_init(Block_s *block, size_t bs,bool cursor_init) {
-    block->entries = BBQ_ALLOC(sizeof(bbq_data) * bs);
-    if (unlinkely(block->entries) == NULL){
+int block_init(Block_s *block, size_t bs, bool cursor_init) {
+    block->entries = BBQ_ALLOC(sizeof(bbq_data *) * bs);
+    if (unlinkely(block->entries) == NULL) {
         return BBQ_ALLOC_ERR;
     }
 
@@ -17,21 +17,20 @@ int block_init(Block_s *block, size_t bs,bool cursor_init) {
     block->committed = 0;
     block->consumed = 0;
     block->consumed = 0;
-    block->bs = bs;
 
-    if (cursor_init){
+    if (cursor_init) {
         // block数组里，除了第一块之外需要设置
         block->committed |= bs;
         block->allocated |= bs;
         block->reserved |= bs;
-        block->consumed |= bs; 
+        block->consumed |= bs;
     }
 
     return BBQ_OK;
 }
 
-void block_cleanup(Block_s *block){
-    BBQ_FREE(block->entries); 
+void block_cleanup(Block_s *block) {
+    BBQ_FREE(block->entries);
 }
 
 // 返回以2为底的对数并向下取整值：也就是求x 的二进制表示中最高位（最左边的1）的位置（位置从0开始）
@@ -50,9 +49,8 @@ unsigned ceil_log2(uint64_t x) {
     return x == 1 ? 0 : floor_log2(x - 1) + 1;
 }
 
-
-int BlockBoundedQueue_init(BlockBoundedQueue_s *q, size_t bn, size_t bs, Policy_e policy){
-    if (q = NULL){
+int BlockBoundedQueue_init(BlockBoundedQueue_s *q, size_t bn, size_t bs, Policy_e policy) {
+    if (q = NULL) {
         return BBQ_NULL_PTR;
     }
 
@@ -67,7 +65,7 @@ int BlockBoundedQueue_init(BlockBoundedQueue_s *q, size_t bn, size_t bs, Policy_
     }
 
     // TODO:是否需要考虑确认，bits位是否满了，无法给version留空间？？即限制BN和BS的边界?ceil_log2返回值至少<64?
-    q->idx_bits = ceil_log2(bn); // head 索引的个数，为方便快速取idx（通过掩码），把BN和BS的值扩充为2的N次幂
+    q->idx_bits = ceil_log2(bn);     // head 索引的个数，为方便快速取idx（通过掩码），把BN和BS的值扩充为2的N次幂
     q->off_bits = ceil_log2(bs) + 1; // Cursor偏移的个数 TODO:  +1 是否合理？如果BS较小，线程较多，+1够吗？
     q->idx_mask = (1 << q->idx_bits) - 1;
     q->off_mask = (1 << q->off_bits) - 1;
@@ -82,8 +80,8 @@ int BlockBoundedQueue_init(BlockBoundedQueue_s *q, size_t bn, size_t bs, Policy_
     q->advance_chead = advance_chead;
 }
 
-int BlockBoundedQueue_cleanup(BlockBoundedQueue_s *q){
-    if (q = NULL){
+int BlockBoundedQueue_cleanup(BlockBoundedQueue_s *q) {
+    if (q = NULL) {
         return BBQ_NULL_PTR;
     }
 
@@ -94,24 +92,23 @@ int BlockBoundedQueue_cleanup(BlockBoundedQueue_s *q){
     BBQ_FREE(q->blocks);
 }
 
-QueueStatus_s enqueue (BlockBoundedQueue_s *q, bbq_data data){
+QueueStatus_s enqueue(BlockBoundedQueue_s *q, bbq_data data) {
     while (true) {
         // 获取当前phead，转为索引后获取到当前的blk
         uint64_t ph = atomic_load(&q->phead);
         Block_s *blk = &(q->blocks[q->idx(ph)]);
 
         QueueState_s ps;
-        QueueState_s state = allocate_entry(blk);
+        QueueState_s state = allocate_entry(q, blk);
         QueueStatus_s status;
 
         switch (state.state) {
         case ALLOCATED:
-            commit_entry(&state.data.e, data);
+            commit_entry(&state.e, data);
             status.status = OK;
             return status;
         case BLOCK_DONE:
-            QueueStatus_s status;
-            ps = advance_phead(ph);
+            ps = advance_phead(q, ph);
             switch (ps.state) {
             case NO_ENTRY:
                 status.status = FULL;
@@ -129,86 +126,249 @@ QueueStatus_s enqueue (BlockBoundedQueue_s *q, bbq_data data){
     }
 }
 
-QueueStatus_s dequeue (){
-     while (true) {
-        auto ch = chead.load(std::memory_order_acquire);
-        auto &blk = blocks[idx(ch)];
+QueueStatus_s dequeue(BlockBoundedQueue_s *q) {
+    while (true) {
+        uint64_t ch = atomic_load(&q->chead);
+        Block_s *blk = &(q->blocks[q->idx(ch)]);
 
-        T *data;
-        auto state = reserve_entry(blk);
-        switch (state.index()) {
+        bbq_data data;
+        QueueState_s state;
+        state = reserve_entry(q, blk);
+        QueueStatus_s status;
+
+        switch (state.state) {
         case RESERVED:
-            data = consume_entry(std::get_if<Reserved<T, BS>>(&state)->e);
-            if (data)
-                return OK<T>{.data = *data};
-            else
+            data = consume_entry(q, &state.e);
+            if (data) {
+                status.status = OK;
+                status.data = data;
+                return status;
+            } else {
                 continue;
+            }
         case NO_ENTRY:
-            return Empty{};
+            status.status = EMPTY;
+            return status;
         case NOT_AVAILABLE:
-            return Busy{};
+            status.status = BUSY;
+            return status;
         case BLOCK_DONE:
-            if (advance_chead(ch, std::get_if<BlockDone>(&state)->vsn))
+            if (advance_chead(q, ch, state.vsn)) {
                 continue;
-            else
-                return Empty{};
+            } else {
+                status.status = EMPTY;
+            }
         default:
-            throw std::range_error("Invalid QueueState in dequeue: " + std::to_string(state.index()));
+            BBQ_ERR_LOG("Invalid QueueState in dequeue: %d\n", state.state);
         }
     }
 }
 
-QueueState_s allocate_entry(Block_s *block){
-    
+QueueState_s allocate_entry(BlockBoundedQueue_s *q, Block_s *block) {
+    QueueState_s state;
+    if (off(q, atomic_load(&block->allocated)) >= q->bs) {
+        state.state = BLOCK_DONE;
+        return state;
+    }
+
+    // TODO:check 有没有影响?检查是否会因为多线程同时add，超过了预留的位段，溢出后实际已超，但是认为还有数据？？？？
+    uint64_t old = atomic_fetch_add(&block->allocated, 1);
+    if (off(q, old) >= q->bs) {
+        state.state = BLOCK_DONE;
+        return state;
+    }
+
+    state.state = ALLOCATED;
+    state.e.block = block;
+    state.e.vsn = cur_vsn(q, old);
+    state.e.off = off(q, old);
+
+    return state;
 }
 
 void commit_entry(EntryDesc_s *e, bbq_data data) {
-
+    e->block->entries[e->off] = data;
+    atomic_fetch_add(&e->block->committed, 1);
 }
 
-QueueState_s advance_phead(uint64_t ph){
-    
+QueueState_s advance_phead(BlockBoundedQueue_s *q, uint64_t ph) {
+    // 获取下一个block TODO:改进，%BN修改为dpdk ring一样的
+    Block_s *n_blk;
+    n_blk = &(q->blocks[(idx(q, ph) + 1) % q->bn]);
+
+    // printf("## [B]advance_phead, cur phead_vsn:%u phead_idx:%u\n", head_vsn(phead),idx(phead));
+    // printf("## [B]next block, allocated_vsn:%u allocated_idx:%u\n", cur_vsn(n_blk.allocated), off(n_blk.allocated));
+    // printf("## [B]next block, committed_vsn:%u committed_idx:%u\n", cur_vsn(n_blk.committed), off(n_blk.committed));
+    // printf("## [B]next block, consumed_vsn:%u consumed_idx:%u\n", cur_vsn(n_blk.consumed), off(n_blk.consumed));
+
+    uint64_t cur, reserved;
+    QueueState_s state;
+    switch (q->policy) {
+    case RETRY_NEW:
+        // consumed
+        cur = atomic_load(&n_blk->consumed);
+        if (cur_vsn(q, cur) < head_vsn(q, ph) || (cur_vsn(q, cur) == head_vsn(q, ph) && off(q, cur) != q->bs)) {
+            // printf("@@ [B]next block, consumed_vsn:%u consumed_idx:%u\n", cur_vsn(n_blk.consumed), off(n_blk.consumed));
+            // printf("@@ [B]advance_phead, cur phead_vsn:%u phead_idx:%u\n", head_vsn(phead),idx(phead));
+            // printf("@@ [B]advance_phead, cur chead_vsn:%u chead_idx:%u\n", head_vsn(chead),idx(chead));
+            reserved = atomic_load(&n_blk->reserved);
+            if (off(q, reserved) == off(q, cur)) {
+                state.state = NO_ENTRY;
+            } else {
+                state.state = NOT_AVAILABLE;
+            }
+            return state;
+        }
+        break;
+    case DROP_OLD:
+        // committed
+        cur = atomic_load(&n_blk->committed);
+        // 生产者避免前进到上一轮中尚未完全提交的区块，TODO: 什么时候回来出现< 或 >的情况？？？
+        if (cur_vsn(q, cur) == head_vsn(q, ph) && off(q, cur) != q->bs) {
+            state.state = NOT_AVAILABLE;
+            return state;
+        }
+        break;
+    default:
+        break;
+    }
+
+    // 用head的version初始化下一个块，version在高位，version+1，idex/offset清零，如果没有被其他线程执行过，数值会高于旧值
+    fetch_max(n_blk->committed, set_cur_vsn(q, head_vsn(q, ph) + 1));
+    fetch_max(n_blk->allocated, set_cur_vsn(q, head_vsn(q, ph) + 1));
+
+    // 索引+1，当超过索引范围，也就是循环下一轮块时，version+1
+    fetch_max(q->phead, ph + 1);
+
+    // printf("!! [AF]next block, allocated_vsn:%u allocated_idx:%u\n", cur_vsn(n_blk.allocated), off(n_blk.allocated));
+    // printf("!! [AF]next block, committed_vsn:%u committed_idx:%u\n", cur_vsn(n_blk.committed), off(n_blk.committed));
+    // printf("!! [AF]advance_phead, cur phead_vsn:%u phead_idx:%u\n\n", head_vsn(phead),idx(phead));
+
+    state.state = SUCCESS;
+    return state;
 }
 
-QueueState_s reserve_entry(Block_s *block){
-    
+QueueState_s reserve_entry(BlockBoundedQueue_s *q, Block_s *block) {
+    while (true) {
+        QueueState_s state;
+        uint64_t reserved = atomic_load(&block->reserved);
+        if (off(q, reserved) < q->bs) {
+            uint64_t committed = atomic_load(&block->committed);
+            if (off(q, committed) == off(q, reserved)) { // TODO: 多entry的时候关注
+                state.state = NO_ENTRY;
+                return state;
+            }
+
+            // 当前块的数据没有被全部comit，需要通过判断allocated和committed来判断是否存在正在入队进行中的数据
+            if (off(q, committed) != q->bs) {
+                uint64_t allocated = atomic_load(&block->allocated);
+                if (off(q, allocated) != off(q, committed)) {
+                    state.state = NOT_AVAILABLE;
+                    return state;
+                }
+            }
+
+            if (fetch_max(block->reserved, reserved + 1) == reserved) {
+                // fetch_max返回的是旧值，因此预期返回的旧值要等于局部变量reserved
+                state.state = RESERVED;
+                state.e.block = &block;
+                state.e.off = off(q, reserved);
+                state.e.vsn = cur_vsn(q, reserved);
+
+                return state;
+            } else {
+                // 如果不等于代表block.reserved被其他线程Reserved了
+                continue;
+            }
+        }
+
+        state.state = BLOCK_DONE;
+        state.vsn = cur_vsn(q, reserved);
+
+        return state;
+    }
 }
 
-bbq_data consume_entry(EntryDesc_s *e){
-    
+bbq_data consume_entry(BlockBoundedQueue_s *q, EntryDesc_s *e) {
+    bbq_data data = e->block->entries[e->off];
+
+    uint64_t allocated;
+    switch (q->policy) {
+    case RETRY_NEW:
+        atomic_fetch_add(&e->block->consumed, 1);
+        break;
+    case DROP_OLD:
+        allocated = atomic_fetch_add(&e->block->allocated, 1);
+        if (cur_vsn(q, allocated) != e->vsn)
+            return NULL;
+        break;
+    default:
+        break;
+    }
+
+    return data;
 }
 
-bool advance_chead(uint64_t ch, uint64_t ver){
-    
+static bool advance_chead(BlockBoundedQueue_s *q, uint64_t ch, uint64_t ver) {
+    Block_s *n_blk = &(q->blocks[(idx(q, ch) + 1) % q->bn]);
+    uint64_t committed = atomic_load(&n_blk->committed);
+
+    // printf("ZZ [B]advance_chead, chead_vsn:%u chead_idx:%u\n", head_vsn(chead),idx(chead));
+    // printf("ZZ [B]next block, consumed_vsn:%u consumed_idx:%u\n", cur_vsn(n_blk.consumed), off(n_blk.consumed));
+    // printf("ZZ [B]next block, reserved_vsn:%u reserved_idx:%u\n", cur_vsn(n_blk.reserved), off(n_blk.reserved));
+
+    switch (q->policy) {
+    case RETRY_NEW:
+        if (cur_vsn(q, committed) != head_vsn(q, ch) + 1)
+            return false;
+        fetch_max(n_blk->consumed, set_cur_vsn(q, head_vsn(q, ch) + 1));
+        fetch_max(n_blk->reserved, set_cur_vsn(q, head_vsn(q, ch) + 1));
+        break;
+    case DROP_OLD:
+        // 通过检查下一个块的版本是否大于或等于当前块来保证 FIFO 顺序，是这种情况，reserved 将被重置为已提交的版本·
+        // 第一个块是一个特殊情况，因为与其他块相比，它的版本总是相差一个。因此，如果 ch.idx == 0，我们在比较中加 1
+        if (cur_vsn(q, committed) < ver + (idx(q, ch) == 0))
+            return false;
+        fetch_max(n_blk->reserved, set_cur_vsn(q, cur_vsn(q, committed)));
+        break;
+    default:
+        break;
+    }
+
+    fetch_max(&q->chead, ch + 1);
+    // printf("YY [AF]next block, consumed_vsn:%u consumed_idx:%u\n", cur_vsn(n_blk.consumed), off(n_blk.consumed));
+    // printf("YY [AF]next block, reserved_vsn:%u reserved_idx:%u\n", cur_vsn(n_blk.reserved), off(n_blk.reserved));
+    // printf("YY [AF]advance_chead, chead_vsn:%u chead_idx:%u\n\n", head_vsn(chead),idx(chead));
+    return true;
 }
 
-inline uint64_t idx(uint64_t x, unsigned idx_mask) { 
-    return x & idx_mask; 
+static inline uint64_t idx(BlockBoundedQueue_s *q, uint64_t x) {
+    return x & q->idx_mask;
 }
 
-inline uint64_t off(uint64_t x, unsigned off_mask){
-    return x & off_mask;
+static inline uint64_t off(BlockBoundedQueue_s *q, uint64_t x) {
+    return x & q->off_mask;
 }
 
 // TODO: 可以改进？文档里version移动的位置是max(idx_bits，off_bits)，在advance里，就能直接赋值，MAX(nblk.committed, Cursor{.vsn=ph.vsn + 1});本代码里做了偏移判断。
-inline uint64_t head_vsn(uint64_t x, unsigned idx_bits) {
-    return x >> idx_bits;
+static inline uint64_t head_vsn(BlockBoundedQueue_s *q, uint64_t x) {
+    return x >> q->idx_bits;
 }
 
-inline uint64_t cur_vsn(uint64_t x, unsigned off_bits) {
-    return x >> off_bits;
+static inline uint64_t cur_vsn(BlockBoundedQueue_s *q, uint64_t x) {
+    return x >> q->off_bits;
 }
 
-inline uint64_t set_cur_vsn(uint64_t ver, unsigned off_bits) {
-    return ver << off_bits;
+inline uint64_t set_cur_vsn(BlockBoundedQueue_s *q, uint64_t ver) {
+    return ver << q->off_bits;
 }
 
 // TODO:测试
-inline uint64_t fetch_max(aotmic_uint64 *atom, uint64_t upd) {  
-    uint64_t old_value;  
-    do {  
-        old_value = atomic_load(atom); // 读取当前值  
+inline uint64_t fetch_max(aotmic_uint64 *atom, uint64_t upd) {
+    uint64_t old_value;
+    do {
+        old_value = atomic_load(atom); // 读取当前值
     } while (old_value < upd && !atomic_compare_exchange_weak(atom, &old_value, upd));
 
-    return old_value;  
+    return old_value;
 }
