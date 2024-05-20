@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu@geedgenetworks.com
- * @LastEditTime: 2024-05-20 19:49:18
+ * @LastEditTime: 2024-05-20 21:50:00
  * @Describe:
  */
 
@@ -81,17 +81,11 @@ typedef struct BlockBoundedQueue {
     unsigned off_bits;
     unsigned idx_mask;
     unsigned off_mask;
-
-    uint64_t (*idx)(uint64_t x);
-    uint64_t (*off)(uint64_t x);
-    // TODO: 可以改进？文档里version移动的位置是max(idx_bits，off_bits)，在advance里，就能直接赋值，MAX(nblk.committed, Cursor{.vsn=ph.vsn + 1});本代码里做了偏移判断。
-    uint64_t (*head_vsn)(uint64_t x);
-    uint64_t (*cur_vsn)(uint64_t x);
-    uint64_t (*set_cur_vsn)(uint64_t ver);
-
 } BlockBoundedQueue_s;
 
 extern BlockBoundedQueue_s *BlockBoundedQueue_create(size_t bn, size_t bs, Policy_e policy);
 extern int BlockBoundedQueue_destory(BlockBoundedQueue_s *q);
+extern QueueStatus_e bbq_enqueue(BlockBoundedQueue_s *q, bbq_data data);
+extern QueueStatus_s bbq_dequeue(BlockBoundedQueue_s *q);
 
 #endif

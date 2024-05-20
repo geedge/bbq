@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-20 20:24:49
+ * @LastEditTime: 2024-05-20 21:54:09
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -123,44 +123,40 @@ int BlockBoundedQueue_destory(BlockBoundedQueue_s *q) {
     return BBQ_OK;
 }
 
-QueueStatus_s enqueue(BlockBoundedQueue_s *q, bbq_data data) {
+QueueStatus_e bbq_enqueue(BlockBoundedQueue_s *q, bbq_data data) {
     while (true) {
         // 获取当前phead，转为索引后获取到当前的blk
         uint64_t ph = atomic_load(&q->phead);
-        Block_s *blk = &(q->blocks[q->idx(ph)]);
+        Block_s *blk = &(q->blocks[idx(q, ph)]);
 
         QueueState_s ps;
         QueueState_s state = allocate_entry(q, blk);
-        QueueStatus_s status;
 
         switch (state.state) {
         case ALLOCATED:
             commit_entry(&state.e, data);
-            status.status = OK;
-            return status;
+            return OK;
         case BLOCK_DONE:
             ps = advance_phead(q, ph);
             switch (ps.state) {
             case NO_ENTRY:
-                status.status = FULL;
-                return status;
+                return FULL;
             case NOT_AVAILABLE:
-                status.status = BUSY;
-                return status;
+                return BUSY;
             case SUCCESS:
                 continue;
             }
             break;
         default:
-            BBQ_ERR_LOG("Invalid QueueState in enqueue: %d\n", state.state);
+            BBQ_ERR_LOG("Invalid QueueState in bbq_enqueue: %d\n", state.state);
         }
     }
 }
 
-QueueStatus_s dequeue(BlockBoundedQueue_s *q) {
+QueueStatus_s bbq_dequeue(BlockBoundedQueue_s *q) {
     while (true) {
         uint64_t ch = atomic_load(&q->chead);
-        Block_s *blk = &(q->blocks[q->idx(ch)]);
+        Block_s *blk = &(q->blocks[idx(q, ch)]);
 
         bbq_data data;
         QueueState_s state;
@@ -414,7 +410,6 @@ static inline void *bbq_malloc(size_t size) {
 
 #ifdef BBQ_DEBUG
     if (ptr != NULL) {
-        BBQ_DBG_LOG("malloc ok:%p", ptr);
         atomic_fetch_add(&malloc_cnt, 1);
     }
 #endif
@@ -430,7 +425,6 @@ static inline void *bbq_memset(void *data, size_t size) {
 static inline void bbq_free(void *ptr) {
 #ifdef BBQ_DEBUG
     if (ptr != NULL) {
-        BBQ_DBG_LOG("try free :%p", ptr);
         atomic_fetch_add(&free_cnt, 1);
     }
 #endif
