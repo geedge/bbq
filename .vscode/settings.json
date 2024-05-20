@@ -43,6 +43,10 @@
         "stdexcept": "c",
         "streambuf": "c",
         "cinttypes": "c",
-        "typeinfo": "c"
+        "typeinfo": "c",
+        "bbq_memory.h": "c",
+        "stdatomic.h": "c",
+        "bbq.h": "c",
+        "stdio.h": "c"
     }
 }

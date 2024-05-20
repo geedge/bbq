@@ -1,15 +1,36 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-20 18:14:06
+ * @LastEditTime: 2024-05-20 18:40:39
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
 #include "bbq.h"
 #include <stdio.h>
 
+static QueueState_s allocate_entry(BlockBoundedQueue_s *q, Block_s *block);
+static void commit_entry(EntryDesc_s *e, bbq_data data);
+static QueueState_s advance_phead(BlockBoundedQueue_s *q, uint64_t ph);
+static QueueState_s reserve_entry(BlockBoundedQueue_s *q, Block_s *block);
+static bbq_data consume_entry(BlockBoundedQueue_s *q, EntryDesc_s *e);
+static bool advance_chead(BlockBoundedQueue_s *q, uint64_t ch, uint64_t ver);
+static inline uint64_t idx(BlockBoundedQueue_s *q, uint64_t x);
+static inline uint64_t off(BlockBoundedQueue_s *q, uint64_t x);
+static inline uint64_t head_vsn(BlockBoundedQueue_s *q, uint64_t x);
+static inline uint64_t cur_vsn(BlockBoundedQueue_s *q, uint64_t x);
+static inline uint64_t set_cur_vsn(BlockBoundedQueue_s *q, uint64_t ver);
+static inline uint64_t fetch_max(aotmic_uint64 *atom, uint64_t upd);
+
+static void *bbq_malloc(size_t size) {
+    return malloc(size);
+}
+
+static void bbq_free(void *ptr) {
+    free(ptr);
+}
+
 int block_init(Block_s *block, size_t bs, bool cursor_init) {
-    block->entries = BBQ_ALLOC(sizeof(bbq_data *) * bs);
-    if (unlinkely(block->entries) == NULL) {
+    block->entries = bbq_malloc(sizeof(bbq_data *) * bs);
+    if (block->entries == NULL) {
         return BBQ_ALLOC_ERR;
     }
 
@@ -30,7 +51,7 @@ int block_init(Block_s *block, size_t bs, bool cursor_init) {
 }
 
 void block_cleanup(Block_s *block) {
-    BBQ_FREE(block->entries);
+    bbq_free(block->entries);
 }
 
 // 返回以2为底的对数并向下取整值：也就是求x 的二进制表示中最高位（最左边的1）的位置（位置从0开始）
@@ -49,7 +70,8 @@ unsigned ceil_log2(uint64_t x) {
     return x == 1 ? 0 : floor_log2(x - 1) + 1;
 }
 
-int BlockBoundedQueue_init(BlockBoundedQueue_s *q, size_t bn, size_t bs, Policy_e policy) {
+BlockBoundedQueue_s *BlockBoundedQueue_create(size_t bn, size_t bs, Policy_e policy) {
+    BlockBoundedQueue_s *q = bbq_malloc(sizeof(BlockBoundedQueue_s));
     if (q = NULL) {
         return BBQ_NULL_PTR;
     }
@@ -57,7 +79,7 @@ int BlockBoundedQueue_init(BlockBoundedQueue_s *q, size_t bn, size_t bs, Policy_
     q->phead = 0;
     q->chead = 0;
     q->policy = policy;
-    q->blocks = BBQ_ALLOC(bn);
+    q->blocks = bbq_malloc(bn);
 
     block_init(&(q->blocks[0]), bs, false);
     for (size_t i = 1; i < bs; ++i) {
@@ -69,18 +91,10 @@ int BlockBoundedQueue_init(BlockBoundedQueue_s *q, size_t bn, size_t bs, Policy_
     q->off_bits = ceil_log2(bs) + 1; // Cursor偏移的个数 TODO:  +1 是否合理？如果BS较小，线程较多，+1够吗？
     q->idx_mask = (1 << q->idx_bits) - 1;
     q->off_mask = (1 << q->off_bits) - 1;
-
-    q->enqueue = enqueue;
-    q->dequeue = dequeue;
-    q->allocate_entry = allocate_entry;
-    q->commit_entry = commit_entry;
-    q->advance_phead = advance_phead;
-    q->reserve_entry = reserve_entry;
-    q->consume_entry = consume_entry;
-    q->advance_chead = advance_chead;
 }
 
-int BlockBoundedQueue_cleanup(BlockBoundedQueue_s *q) {
+// TODO:检查队列是否都被消费了再删除？
+int BlockBoundedQueue_destory(BlockBoundedQueue_s *q) {
     if (q = NULL) {
         return BBQ_NULL_PTR;
     }
@@ -89,7 +103,8 @@ int BlockBoundedQueue_cleanup(BlockBoundedQueue_s *q) {
         block_cleanup(&(q->blocks[i]));
     }
 
-    BBQ_FREE(q->blocks);
+    bbq_free(q->blocks);
+    return BBQ_OK;
 }
 
 QueueStatus_s enqueue(BlockBoundedQueue_s *q, bbq_data data) {
@@ -164,7 +179,7 @@ QueueStatus_s dequeue(BlockBoundedQueue_s *q) {
     }
 }
 
-QueueState_s allocate_entry(BlockBoundedQueue_s *q, Block_s *block) {
+static QueueState_s allocate_entry(BlockBoundedQueue_s *q, Block_s *block) {
     QueueState_s state;
     if (off(q, atomic_load(&block->allocated)) >= q->bs) {
         state.state = BLOCK_DONE;
@@ -186,12 +201,12 @@ QueueState_s allocate_entry(BlockBoundedQueue_s *q, Block_s *block) {
     return state;
 }
 
-void commit_entry(EntryDesc_s *e, bbq_data data) {
+static void commit_entry(EntryDesc_s *e, bbq_data data) {
     e->block->entries[e->off] = data;
     atomic_fetch_add(&e->block->committed, 1);
 }
 
-QueueState_s advance_phead(BlockBoundedQueue_s *q, uint64_t ph) {
+static QueueState_s advance_phead(BlockBoundedQueue_s *q, uint64_t ph) {
     // 获取下一个block TODO:改进，%BN修改为dpdk ring一样的
     Block_s *n_blk;
     n_blk = &(q->blocks[(idx(q, ph) + 1) % q->bn]);
@@ -234,11 +249,11 @@ QueueState_s advance_phead(BlockBoundedQueue_s *q, uint64_t ph) {
     }
 
     // 用head的version初始化下一个块，version在高位，version+1，idex/offset清零，如果没有被其他线程执行过，数值会高于旧值
-    fetch_max(n_blk->committed, set_cur_vsn(q, head_vsn(q, ph) + 1));
-    fetch_max(n_blk->allocated, set_cur_vsn(q, head_vsn(q, ph) + 1));
+    fetch_max(&n_blk->committed, set_cur_vsn(q, head_vsn(q, ph) + 1));
+    fetch_max(&n_blk->allocated, set_cur_vsn(q, head_vsn(q, ph) + 1));
 
     // 索引+1，当超过索引范围，也就是循环下一轮块时，version+1
-    fetch_max(q->phead, ph + 1);
+    fetch_max(&q->phead, ph + 1);
 
     // printf("!! [AF]next block, allocated_vsn:%u allocated_idx:%u\n", cur_vsn(n_blk.allocated), off(n_blk.allocated));
     // printf("!! [AF]next block, committed_vsn:%u committed_idx:%u\n", cur_vsn(n_blk.committed), off(n_blk.committed));
@@ -248,7 +263,7 @@ QueueState_s advance_phead(BlockBoundedQueue_s *q, uint64_t ph) {
     return state;
 }
 
-QueueState_s reserve_entry(BlockBoundedQueue_s *q, Block_s *block) {
+static QueueState_s reserve_entry(BlockBoundedQueue_s *q, Block_s *block) {
     while (true) {
         QueueState_s state;
         uint64_t reserved = atomic_load(&block->reserved);
@@ -268,10 +283,10 @@ QueueState_s reserve_entry(BlockBoundedQueue_s *q, Block_s *block) {
                 }
             }
 
-            if (fetch_max(block->reserved, reserved + 1) == reserved) {
+            if (fetch_max(&block->reserved, reserved + 1) == reserved) {
                 // fetch_max返回的是旧值，因此预期返回的旧值要等于局部变量reserved
                 state.state = RESERVED;
-                state.e.block = &block;
+                state.e.block = block;
                 state.e.off = off(q, reserved);
                 state.e.vsn = cur_vsn(q, reserved);
 
@@ -289,7 +304,7 @@ QueueState_s reserve_entry(BlockBoundedQueue_s *q, Block_s *block) {
     }
 }
 
-bbq_data consume_entry(BlockBoundedQueue_s *q, EntryDesc_s *e) {
+static bbq_data consume_entry(BlockBoundedQueue_s *q, EntryDesc_s *e) {
     bbq_data data = e->block->entries[e->off];
 
     uint64_t allocated;
@@ -321,15 +336,15 @@ static bool advance_chead(BlockBoundedQueue_s *q, uint64_t ch, uint64_t ver) {
     case RETRY_NEW:
         if (cur_vsn(q, committed) != head_vsn(q, ch) + 1)
             return false;
-        fetch_max(n_blk->consumed, set_cur_vsn(q, head_vsn(q, ch) + 1));
-        fetch_max(n_blk->reserved, set_cur_vsn(q, head_vsn(q, ch) + 1));
+        fetch_max(&n_blk->consumed, set_cur_vsn(q, head_vsn(q, ch) + 1));
+        fetch_max(&n_blk->reserved, set_cur_vsn(q, head_vsn(q, ch) + 1));
         break;
     case DROP_OLD:
         // 通过检查下一个块的版本是否大于或等于当前块来保证 FIFO 顺序，是这种情况，reserved 将被重置为已提交的版本·
         // 第一个块是一个特殊情况，因为与其他块相比，它的版本总是相差一个。因此，如果 ch.idx == 0，我们在比较中加 1
         if (cur_vsn(q, committed) < ver + (idx(q, ch) == 0))
             return false;
-        fetch_max(n_blk->reserved, set_cur_vsn(q, cur_vsn(q, committed)));
+        fetch_max(&n_blk->reserved, set_cur_vsn(q, cur_vsn(q, committed)));
         break;
     default:
         break;
@@ -359,12 +374,12 @@ static inline uint64_t cur_vsn(BlockBoundedQueue_s *q, uint64_t x) {
     return x >> q->off_bits;
 }
 
-inline uint64_t set_cur_vsn(BlockBoundedQueue_s *q, uint64_t ver) {
+static inline uint64_t set_cur_vsn(BlockBoundedQueue_s *q, uint64_t ver) {
     return ver << q->off_bits;
 }
 
 // TODO:测试
-inline uint64_t fetch_max(aotmic_uint64 *atom, uint64_t upd) {
+static inline uint64_t fetch_max(aotmic_uint64 *atom, uint64_t upd) {
     uint64_t old_value;
     do {
         old_value = atomic_load(atom); // 读取当前值

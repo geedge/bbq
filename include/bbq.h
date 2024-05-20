@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu@geedgenetworks.com
- * @LastEditTime: 2024-05-20 17:41:55
+ * @LastEditTime: 2024-05-20 18:38:15
  * @Describe:
  */
 
@@ -68,8 +68,6 @@ typedef enum {
 } Policy_e;
 
 typedef struct BlockBoundedQueue {
-    QueueStatus_s (*enqueue)(bbq_data data);
-    QueueStatus_s (*dequeue)();
     Head phead;
     Head chead;
     Policy_e policy;
@@ -82,14 +80,6 @@ typedef struct BlockBoundedQueue {
     unsigned idx_mask;
     unsigned off_mask;
 
-    QueueState_s (*allocate_entry)(Block_s *block);
-    void (*commit_entry)(EntryDesc_s *e, bbq_data data);
-
-    QueueState_s (*advance_phead)(uint64_t ph);
-    QueueState_s (*reserve_entry)(Block_s *block);
-    bbq_data (*consume_entry)(EntryDesc_s *e);
-    bool (*advance_chead)(uint64_t ch, uint64_t ver);
-
     uint64_t (*idx)(uint64_t x);
     uint64_t (*off)(uint64_t x);
     // TODO: 可以改进？文档里version移动的位置是max(idx_bits，off_bits)，在advance里，就能直接赋值，MAX(nblk.committed, Cursor{.vsn=ph.vsn + 1});本代码里做了偏移判断。
@@ -97,5 +87,8 @@ typedef struct BlockBoundedQueue {
     uint64_t (*cur_vsn)(uint64_t x);
     uint64_t (*set_cur_vsn)(uint64_t ver);
 } BlockBoundedQueue_s;
+
+extern BlockBoundedQueue_s *BlockBoundedQueue_create(size_t bn, size_t bs, Policy_e policy);
+extern int BlockBoundedQueue_destory(BlockBoundedQueue_s *q);
 
 #endif
