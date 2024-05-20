@@ -1,11 +1,13 @@
 /*
  * @Author: liuyu@geedgenetworks.com
- * @LastEditTime: 2024-05-20 18:38:15
+ * @LastEditTime: 2024-05-20 19:49:18
  * @Describe:
  */
 
 #ifndef _BBQ_H_
 #define _BBQ_H_
+
+#define BBQ_DEBUG
 
 #include "bbq_error.h"
 #include "bbq_log.h"
@@ -86,6 +88,7 @@ typedef struct BlockBoundedQueue {
     uint64_t (*head_vsn)(uint64_t x);
     uint64_t (*cur_vsn)(uint64_t x);
     uint64_t (*set_cur_vsn)(uint64_t ver);
+
 } BlockBoundedQueue_s;
 
 extern BlockBoundedQueue_s *BlockBoundedQueue_create(size_t bn, size_t bs, Policy_e policy);

@@ -47,6 +47,8 @@
         "bbq_memory.h": "c",
         "stdatomic.h": "c",
         "bbq.h": "c",
-        "stdio.h": "c"
+        "stdio.h": "c",
+        "stdbool.h": "c",
+        "bbq_error.h": "c"
     }
 }

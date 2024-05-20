@@ -1,11 +1,12 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-20 18:48:59
+ * @LastEditTime: 2024-05-20 20:24:49
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
 #include "bbq.h"
 #include <stdio.h>
+#include <string.h>
 
 static QueueState_s allocate_entry(BlockBoundedQueue_s *q, Block_s *block);
 static void commit_entry(EntryDesc_s *e, bbq_data data);
@@ -19,21 +20,16 @@ static inline uint64_t head_vsn(BlockBoundedQueue_s *q, uint64_t x);
 static inline uint64_t cur_vsn(BlockBoundedQueue_s *q, uint64_t x);
 static inline uint64_t set_cur_vsn(BlockBoundedQueue_s *q, uint64_t ver);
 static inline uint64_t fetch_max(aotmic_uint64 *atom, uint64_t upd);
-
-static void *bbq_malloc(size_t size) {
-    return malloc(size);
-}
-
-static void bbq_free(void *ptr) {
-    free(ptr);
-}
+static inline void *bbq_malloc(size_t size);
+static inline void *bbq_memset(void *data, size_t size);
+static inline void bbq_free(void *ptr);
 
 int block_init(Block_s *block, size_t bs, bool cursor_init) {
-    block->entries = bbq_malloc(sizeof(bbq_data *) * bs);
+    block->entries = bbq_malloc(sizeof(bbq_data) * bs);
     if (block->entries == NULL) {
+        BBQ_ERR_LOG("bbq_malloc error\n");
         return BBQ_ALLOC_ERR;
     }
-
     block->allocated = 0;
     block->committed = 0;
     block->consumed = 0;
@@ -50,8 +46,9 @@ int block_init(Block_s *block, size_t bs, bool cursor_init) {
     return BBQ_OK;
 }
 
-void block_cleanup(Block_s *block) {
+void block_cleanup(Block_s *block, size_t bs) {
     bbq_free(block->entries);
+    block->entries = NULL;
 }
 
 // 返回以2为底的对数并向下取整值：也就是求x 的二进制表示中最高位（最左边的1）的位置（位置从0开始）
@@ -71,20 +68,34 @@ unsigned ceil_log2(uint64_t x) {
 }
 
 BlockBoundedQueue_s *BlockBoundedQueue_create(size_t bn, size_t bs, Policy_e policy) {
+    int ret = 0;
     BlockBoundedQueue_s *q = bbq_malloc(sizeof(BlockBoundedQueue_s));
-    if (q = NULL) {
-        BBQ_ERR_LOG("bbq_malloc error\n");
+    if (q == NULL) {
+        BBQ_ERR_LOG("malloc error\n");
         return NULL;
     }
+    bbq_memset(q, sizeof(BlockBoundedQueue_s));
 
     q->phead = 0;
     q->chead = 0;
     q->policy = policy;
-    q->blocks = bbq_malloc(bn);
+    q->blocks = bbq_malloc(bn * sizeof(Block_s));
+    if (q->blocks == NULL) {
+        BBQ_ERR_LOG("malloc error\n");
+        return NULL;
+    }
+    q->bn = bn;
+    q->bs = bs;
 
-    block_init(&(q->blocks[0]), bs, false);
-    for (size_t i = 1; i < bs; ++i) {
-        block_init(&(q->blocks[i]), bs, true);
+    for (size_t i = 0; i < bn; ++i) {
+        // 第一个block不需要设置cursor_init_flag
+        bool cursor_init_flag = (i == 0 ? false : true);
+        ret = block_init(&(q->blocks[i]), bs, cursor_init_flag);
+        if (ret != BBQ_OK) {
+            BBQ_ERR_LOG("block init error\n");
+            BlockBoundedQueue_destory(q);
+            return NULL;
+        }
     }
 
     // TODO:是否需要考虑确认，bits位是否满了，无法给version留空间？？即限制BN和BS的边界?ceil_log2返回值至少<64?
@@ -93,20 +104,22 @@ BlockBoundedQueue_s *BlockBoundedQueue_create(size_t bn, size_t bs, Policy_e pol
     q->idx_mask = (1 << q->idx_bits) - 1;
     q->off_mask = (1 << q->off_bits) - 1;
 
-    return NULL;
+    return q;
 }
 
 // TODO:检查队列是否都被消费了再删除？
 int BlockBoundedQueue_destory(BlockBoundedQueue_s *q) {
-    if (q = NULL) {
+    if (q == NULL) {
         return BBQ_NULL_PTR;
     }
 
     for (size_t i = 0; i < q->bn; ++i) {
-        block_cleanup(&(q->blocks[i]));
+        block_cleanup(&(q->blocks[i]), q->bs);
     }
 
     bbq_free(q->blocks);
+    bbq_free(q);
+
     return BBQ_OK;
 }
 
@@ -389,4 +402,44 @@ static inline uint64_t fetch_max(aotmic_uint64 *atom, uint64_t upd) {
     } while (old_value < upd && !atomic_compare_exchange_weak(atom, &old_value, upd));
 
     return old_value;
+}
+
+#ifdef BBQ_DEBUG
+static aotmic_uint64 malloc_cnt = 0;
+static aotmic_uint64 free_cnt = 0;
+#endif
+
+static inline void *bbq_malloc(size_t size) {
+    void *ptr = malloc(size);
+
+#ifdef BBQ_DEBUG
+    if (ptr != NULL) {
+        BBQ_DBG_LOG("malloc ok:%p", ptr);
+        atomic_fetch_add(&malloc_cnt, 1);
+    }
+#endif
+    return ptr;
+}
+
+static inline void *bbq_memset(void *data, size_t size) {
+    if (data != NULL && size > 0) {
+        memset(data, 0, size);
+    }
+}
+
+static inline void bbq_free(void *ptr) {
+#ifdef BBQ_DEBUG
+    if (ptr != NULL) {
+        BBQ_DBG_LOG("try free :%p", ptr);
+        atomic_fetch_add(&free_cnt, 1);
+    }
+#endif
+    free(ptr);
+}
+
+void bbq_memory_info() {
+#ifdef BBQ_DEBUG
+    BBQ_DBG_LOG("malloc cnt:%lu", atomic_load(&malloc_cnt));
+    BBQ_DBG_LOG("free cnt:%lu", atomic_load(&free_cnt));
+#endif
 }
