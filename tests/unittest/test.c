@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-20 18:39:38
+ * @LastEditTime: 2024-05-20 18:49:36
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -11,8 +11,8 @@ int main() {
     BlockBoundedQueue_s *q;
     q = BlockBoundedQueue_create(5, 4, RETRY_NEW);
     if (q == NULL) {
-        bbq_error_log("BlockBoundedQueue_create err ,ptr is NULL\n");
-        return;
+        BBQ_ERR_LOG("BlockBoundedQueue_create err ,ptr is NULL\n");
+        return -1;
     }
 
     BlockBoundedQueue_destory(q);

@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-20 18:40:39
+ * @LastEditTime: 2024-05-20 18:48:59
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -73,7 +73,8 @@ unsigned ceil_log2(uint64_t x) {
 BlockBoundedQueue_s *BlockBoundedQueue_create(size_t bn, size_t bs, Policy_e policy) {
     BlockBoundedQueue_s *q = bbq_malloc(sizeof(BlockBoundedQueue_s));
     if (q = NULL) {
-        return BBQ_NULL_PTR;
+        BBQ_ERR_LOG("bbq_malloc error\n");
+        return NULL;
     }
 
     q->phead = 0;
@@ -91,6 +92,8 @@ BlockBoundedQueue_s *BlockBoundedQueue_create(size_t bn, size_t bs, Policy_e pol
     q->off_bits = ceil_log2(bs) + 1; // Cursor偏移的个数 TODO:  +1 是否合理？如果BS较小，线程较多，+1够吗？
     q->idx_mask = (1 << q->idx_bits) - 1;
     q->off_mask = (1 << q->off_bits) - 1;
+
+    return NULL;
 }
 
 // TODO:检查队列是否都被消费了再删除？
