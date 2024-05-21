@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-20 21:54:09
+ * @LastEditTime: 2024-05-21 14:36:23
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -27,7 +27,7 @@ static inline void bbq_free(void *ptr);
 int block_init(Block_s *block, size_t bs, bool cursor_init) {
     block->entries = bbq_malloc(sizeof(bbq_data) * bs);
     if (block->entries == NULL) {
-        BBQ_ERR_LOG("bbq_malloc error\n");
+        BBQ_ERR_LOG("bbq_malloc error");
         return BBQ_ALLOC_ERR;
     }
     block->allocated = 0;
@@ -71,7 +71,7 @@ BlockBoundedQueue_s *BlockBoundedQueue_create(size_t bn, size_t bs, Policy_e pol
     int ret = 0;
     BlockBoundedQueue_s *q = bbq_malloc(sizeof(BlockBoundedQueue_s));
     if (q == NULL) {
-        BBQ_ERR_LOG("malloc error\n");
+        BBQ_ERR_LOG("malloc error");
         return NULL;
     }
     bbq_memset(q, sizeof(BlockBoundedQueue_s));
@@ -81,7 +81,7 @@ BlockBoundedQueue_s *BlockBoundedQueue_create(size_t bn, size_t bs, Policy_e pol
     q->policy = policy;
     q->blocks = bbq_malloc(bn * sizeof(Block_s));
     if (q->blocks == NULL) {
-        BBQ_ERR_LOG("malloc error\n");
+        BBQ_ERR_LOG("malloc error");
         return NULL;
     }
     q->bn = bn;
@@ -92,7 +92,7 @@ BlockBoundedQueue_s *BlockBoundedQueue_create(size_t bn, size_t bs, Policy_e pol
         bool cursor_init_flag = (i == 0 ? false : true);
         ret = block_init(&(q->blocks[i]), bs, cursor_init_flag);
         if (ret != BBQ_OK) {
-            BBQ_ERR_LOG("block init error\n");
+            BBQ_ERR_LOG("block init error");
             BlockBoundedQueue_destory(q);
             return NULL;
         }
@@ -148,7 +148,7 @@ QueueStatus_e bbq_enqueue(BlockBoundedQueue_s *q, bbq_data data) {
             }
             break;
         default:
-            BBQ_ERR_LOG("Invalid QueueState in bbq_enqueue: %d\n", state.state);
+            BBQ_ERR_LOG("Invalid QueueState in bbq_enqueue: %d", state.state);
         }
     }
 }
@@ -184,9 +184,10 @@ QueueStatus_s bbq_dequeue(BlockBoundedQueue_s *q) {
                 continue;
             } else {
                 status.status = EMPTY;
+                return status;
             }
         default:
-            BBQ_ERR_LOG("Invalid QueueState in dequeue: %d\n", state.state);
+            BBQ_ERR_LOG("Invalid QueueState in dequeue state: %d", state.state);
         }
     }
 }
@@ -436,4 +437,8 @@ void bbq_memory_info() {
     BBQ_DBG_LOG("malloc cnt:%lu", atomic_load(&malloc_cnt));
     BBQ_DBG_LOG("free cnt:%lu", atomic_load(&free_cnt));
 #endif
+}
+
+bool bbq_malloc_free_equal() {
+    return atomic_load(&malloc_cnt) == atomic_load(&free_cnt);
 }

@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu@geedgenetworks.com
- * @LastEditTime: 2024-05-20 21:50:00
+ * @LastEditTime: 2024-05-21 14:30:57
  * @Describe:
  */
 
@@ -16,9 +16,17 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#ifndef __cplusplus
+// C
 typedef _Atomic uint64_t aotmic_uint64;
 typedef aotmic_uint64 Cursor; // 块内的四种游标（version+off）
 typedef aotmic_uint64 Head;   // 向块的索引（version+idx）
+#else
+// C++ 为了兼容gtest测试
+using Cursor = std::atomic<uint64_t>;
+using Head = std::atomic<uint64_t>;
+#endif
+
 typedef void *bbq_data;
 
 typedef struct Block {
