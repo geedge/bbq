@@ -49,6 +49,7 @@
         "bbq.h": "c",
         "stdio.h": "c",
         "stdbool.h": "c",
-        "bbq_error.h": "c"
+        "bbq_error.h": "c",
+        "stddef.h": "c"
     }
 }

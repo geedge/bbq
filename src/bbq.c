@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-21 14:36:23
+ * @LastEditTime: 2024-05-21 23:24:02
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -30,9 +30,9 @@ int block_init(Block_s *block, size_t bs, bool cursor_init) {
         BBQ_ERR_LOG("bbq_malloc error");
         return BBQ_ALLOC_ERR;
     }
-    block->allocated = 0;
     block->committed = 0;
-    block->consumed = 0;
+    block->allocated = 0;
+    block->reserved = 0;
     block->consumed = 0;
 
     if (cursor_init) {
