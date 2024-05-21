@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-20 22:18:24
+ * @LastEditTime: 2024-05-21 11:21:17
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -10,7 +10,7 @@
 void bbq_memory_info();
 
 int main() {
-    BBQ_DBG_LOG("hello\n");
+    BBQ_DBG_LOG("hello!!!\n");
     BlockBoundedQueue_s *q;
     q = BlockBoundedQueue_create(4, 5, RETRY_NEW);
     if (q == NULL) {

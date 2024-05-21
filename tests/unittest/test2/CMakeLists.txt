@@ -1,0 +1,16 @@
+cmake_minimum_required(VERSION 3.0)
+project(BBQ_UNIT_TESTS)
+
+# 搜索当前cmake文件所在目录下的c文件
+file(GLOB SRC_LIST "${CMAKE_CURRENT_SOURCE_DIR}/*.cc")
+# 指定库路径
+link_directories(${LIB_PATH})
+# 链接静态库
+# link_libraries(bbq)
+# 指定可执行文件输出路径
+set(EXECUTABLE_OUTPUT_PATH ${EXEC_PATH})
+
+add_executable(sampletest ${SRC_LIST}) # 添加可执行程序
+target_link_libraries(sampletest gtest gtest_main) # 链接gtest库
+
+add_test(sampletest ${EXEC_PATH}/sampletest) # 添加测试，保证make test可以执行该测试用例
