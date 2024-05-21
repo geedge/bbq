@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-22 00:02:48
+ * @LastEditTime: 2024-05-22 00:18:56
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -19,22 +19,21 @@ extern void bbq_memory_info();
 namespace {
 extern void *utest_producer_thread(void *arg);
 extern void *utest_consumer_thread(void *arg);
-extern pthread_t *utest_threads_create(BlockBoundedQueue_s *q, size_t pthread_cnt,
+extern pthread_t *utest_threads_create(BlockBoundedQueue_s *q, size_t exec_times, size_t pthread_cnt,
                                        uint32_t pthread_usleep, size_t cthread_cnt,
                                        uint32_t cthread_usleep);
 extern void utest_thread_exit_data_destory(thread_data_s *data);
 extern void *utest_consumer_thread(void *arg);
 extern void utest_thread_create(pthread_t *threads, void *(*__start_routine)(void *),
                                 BlockBoundedQueue_s *q, uint32_t thread_usleep,
-                                bool until_end);
+                                bool until_end, uint64_t thread_exec_times);
 extern void utest_threads_destory(pthread_t *threads);
 extern bool utest_thread_exit_merge_data_compare(thread_data_s *merge_pdata, thread_data_s *deque_datas);
 extern void utest_thread_exit_merge_counter(thread_data_s *data_arr, thread_data_s *data);
 size_t bn = 100;
 size_t bs = 4096;
-size_t pthread_cnt = 1;        // 生产者线程个数
-size_t cthread_cnt = 1;        // 消费者线程个数
-size_t thread_exec_times = bs; // 每个线程生产/消费次数
+size_t pthread_cnt = 10; // 生产者线程个数
+size_t cthread_cnt = 10; // 消费者线程个数
 
 // 空队满队的边界测试
 TEST(boundary, full_empty) {
@@ -86,13 +85,14 @@ TEST(boundary, full_empty) {
 // 多生产者多消费者参加，生产者更快
 TEST(multi_pc, pquick) {
     int ret;
+    uint64_t thread_exec_times = bs * 10;
     pthread_t *threads = NULL; // 存储所有线程ID的数组
 
     BlockBoundedQueue_s *q = BlockBoundedQueue_create(bn, bs, RETRY_NEW);
     EXPECT_TRUE(q != NULL) << "FAILED-1";
 
     // 创建生产者消费者线程
-    threads = utest_threads_create(q, pthread_cnt, 0, cthread_cnt, 10);
+    threads = utest_threads_create(q, bs * 10, pthread_cnt, 0, cthread_cnt, 10);
     size_t thread_cnt = pthread_cnt + cthread_cnt;
     thread_data_s **exit_data = (thread_data_s **)malloc(sizeof(thread_data_s **) * (thread_cnt + 1));
 
@@ -105,7 +105,7 @@ TEST(multi_pc, pquick) {
 
     // 创建消费者线程把队列中剩余的数据读完
     pthread_t last_thread;
-    utest_thread_create(&last_thread, utest_consumer_thread, q, 0, true);
+    utest_thread_create(&last_thread, utest_consumer_thread, q, 0, true, thread_exec_times);
     pthread_join(last_thread, (void **)(&exit_data[i])); // 等待线程结束
 
     // 聚合所有数据
@@ -130,12 +130,12 @@ TEST(multi_pc, pquick) {
     uint64_t merge_pdata_idx = 0;
     uint64_t merge_cdata_idx = 0;
     for (i = 0; i < (thread_cnt + 1); i++) {
-        if (exit_data[i]->type == THREAD_PRODUCER) {
+        if (exit_data[i]->type == THREAD_PRODUCER && merge_pdata->data != NULL) {
             memcpy(&merge_pdata->data[merge_pdata_idx],
                    exit_data[i]->data,
                    sizeof(merge_pdata->data[merge_pdata_idx]));
             merge_pdata_idx++;
-        } else if (exit_data[i]->type == THREAD_CONSUMER) {
+        } else if (exit_data[i]->type == THREAD_CONSUMER && merge_cdata->data != NULL) {
             memcpy(&merge_cdata->data[merge_cdata_idx],
                    exit_data[i]->data,
                    sizeof(merge_cdata->data[merge_cdata_idx]));
@@ -149,7 +149,7 @@ TEST(multi_pc, pquick) {
     // 生产者或消费者的 总执行次数统计符合预期
     EXPECT_NE(merge_pdata->exec_times, 0);
     EXPECT_NE(merge_pdata->succ_times, 0);
-    EXPECT_EQ(merge_pdata->exec_times, thread_exec_times);
+    EXPECT_EQ(merge_pdata->exec_times, pthread_cnt * thread_exec_times);
     EXPECT_EQ(merge_pdata->exec_times, merge_pdata->succ_times + merge_pdata->full_times + merge_pdata->busy_times);
 
     EXPECT_NE(merge_cdata->exec_times, 0);
@@ -180,7 +180,7 @@ thread_data_s *utest_thread_exit_data_init(thread_arg_s *arg, thread_type type) 
     exit_data->exec_times = 0;
 
     exit_data->arg = arg;
-    size_t alloc_size = sizeof(testdata_s) * thread_exec_times;
+    size_t alloc_size = sizeof(testdata_s) * arg->thread_exec_times;
     exit_data->data = (testdata_s *)malloc(alloc_size);
     if (exit_data->data == NULL) {
         BBQ_ERR_LOG("malloc failed");
@@ -276,7 +276,7 @@ void *utest_producer_thread(void *arg) {
     size_t i = 0;
     QueueStatus_e en_status = OK;
 
-    for (size_t i = 0; i < thread_exec_times; i++) {
+    for (size_t i = 0; i < tmp_arg->thread_exec_times; i++) {
         testdata_s *enqueue_data = &exit_data->data[exit_data->succ_times];
         enqueue_data->v1 = i + 1;
         enqueue_data->v2 = i + 1;
@@ -311,7 +311,7 @@ void *utest_consumer_thread(void *arg) {
             break;
         }
 
-        if (tmp_arg->until_end == false && i >= thread_exec_times) {
+        if (tmp_arg->until_end == false && i >= tmp_arg->thread_exec_times) {
             break;
         }
 
@@ -331,17 +331,18 @@ void *utest_consumer_thread(void *arg) {
 
 void utest_thread_create(pthread_t *threads, void *(*thread_func)(void *),
                          BlockBoundedQueue_s *q, uint32_t thread_usleep,
-                         bool until_end) {
+                         bool until_end, uint64_t thread_exec_times) {
     thread_arg_s *arg = (thread_arg_s *)malloc(sizeof(thread_arg_s)); // 线程回收时free
     arg->q = q;
     arg->usleep = thread_usleep;
     arg->until_end = until_end;
+    arg->thread_exec_times = thread_exec_times;
     pthread_create(threads, NULL, thread_func, arg);
 }
 
-pthread_t *utest_threads_create(BlockBoundedQueue_s *q, size_t pthread_cnt,
-                                uint32_t pthread_usleep, size_t cthread_cnt,
-                                uint32_t cthread_usleep) {
+pthread_t *utest_threads_create(BlockBoundedQueue_s *q, uint64_t thread_exec_times,
+                                size_t pthread_cnt, uint32_t pthread_usleep,
+                                size_t cthread_cnt, uint32_t cthread_usleep) {
     int ret;
     size_t thread_id = 0;
     size_t thread_cnt = pthread_cnt + cthread_cnt;
@@ -351,14 +352,14 @@ pthread_t *utest_threads_create(BlockBoundedQueue_s *q, size_t pthread_cnt,
     if (cthread_cnt > 0) {
         // 消费者线程（先启动，读取空队列的场景）
         for (size_t i = 0; i < cthread_cnt; i++, thread_id++) {
-            utest_thread_create(&threads[thread_id], utest_consumer_thread, q, cthread_usleep, false);
+            utest_thread_create(&threads[thread_id], utest_consumer_thread, q, cthread_usleep, false, thread_exec_times);
         }
     }
 
     // 创建生产者线程
     if (pthread_cnt > 0) {
         for (size_t i = 0; i < pthread_cnt; i++, thread_id++) {
-            utest_thread_create(&threads[thread_id], utest_producer_thread, q, pthread_usleep, false);
+            utest_thread_create(&threads[thread_id], utest_producer_thread, q, pthread_usleep, false, thread_exec_times);
         }
     }
 

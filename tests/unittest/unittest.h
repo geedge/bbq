@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-21 20:06:54
+ * @LastEditTime: 2024-05-22 00:17:49
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -19,10 +19,12 @@ typedef enum {
     THREAD_CONSUMER,
     THREAD_TYPE_MAX,
 } thread_type;
+
 typedef struct {
     BlockBoundedQueue_s *q;
-    uint32_t usleep; // 该线程每次执行间隔睡眠时间
-    bool until_end;  // 循环读取，直到队列空或满
+    uint32_t usleep;            // 该线程每次执行间隔睡眠时间
+    bool until_end;             // 循环读取，直到队列空或满
+    uint64_t thread_exec_times; // 每个线程生产/消费次数
 } thread_arg_s;
 
 typedef struct {
