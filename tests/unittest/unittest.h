@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-21 17:52:02
+ * @LastEditTime: 2024-05-21 18:33:31
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -21,6 +21,7 @@ typedef enum {
 typedef struct {
     BlockBoundedQueue_s *q;
     uint32_t usleep; // 该线程每次执行间隔睡眠时间
+    bool until_end;  // 循环读取，直到队列空或满
 } thread_arg_s;
 
 typedef struct {
@@ -32,6 +33,6 @@ typedef struct {
     size_t busy_times;  // 失败，队列忙次数
     size_t empty_times; // 失败，队列空次数
     testdata_s *data;   // 线程数据(v1 > 0的数据才有效)
-    void *arg;          // 创建线程时传入的参数
+    thread_arg_s *arg;  // 创建线程时传入的参数
 } thread_data_s;
 #endif
