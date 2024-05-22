@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0)
-project(BBQ_UNIT_TESTS)
+project(BBQ_UNITTEST)
 
 # 搜索当前cmake文件所在目录下的c文件
 file(GLOB SRC_LIST "${CMAKE_CURRENT_SOURCE_DIR}/*.cc")

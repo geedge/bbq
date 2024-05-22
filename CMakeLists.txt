@@ -21,4 +21,4 @@ enable_testing() # 开启测试，否则无法执行make test
 
 # 添加子目录
 add_subdirectory(src)
-add_subdirectory(tests/unittest)
+add_subdirectory(tests)

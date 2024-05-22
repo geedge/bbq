@@ -50,6 +50,26 @@
         "stdio.h": "c",
         "stdbool.h": "c",
         "bbq_error.h": "c",
-        "stddef.h": "c"
+        "stddef.h": "c",
+        "any": "cpp",
+        "condition_variable": "cpp",
+        "cstring": "cpp",
+        "ctime": "cpp",
+        "map": "cpp",
+        "set": "cpp",
+        "optional": "cpp",
+        "ratio": "cpp",
+        "source_location": "cpp",
+        "iomanip": "cpp",
+        "iostream": "cpp",
+        "istream": "cpp",
+        "mutex": "cpp",
+        "semaphore": "cpp",
+        "sstream": "cpp",
+        "stop_token": "cpp",
+        "thread": "cpp",
+        "variant": "cpp",
+        "test.h": "c",
+        "demo.h": "c"
     }
 }
