@@ -1,10 +1,11 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-21 23:24:02
+ * @LastEditTime: 2024-05-22 19:40:54
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
 #include "bbq.h"
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -23,6 +24,15 @@ static inline uint64_t fetch_max(aotmic_uint64 *atom, uint64_t upd);
 static inline void *bbq_malloc(size_t size);
 static inline void *bbq_memset(void *data, size_t size);
 static inline void bbq_free(void *ptr);
+
+// 根据entries大小返回合理的blocks配置TODO:
+static uint64_t bbq_blocks_calc(uint64_t entries) {
+    double log_entries = log10((double)entries);  // 计算log10(entries)
+    uint64_t over4 = (uint64_t)(log_entries / 4); // 向下取整
+    uint64_t max_value = (over4 > 1) ? over4 : 1; // 取1和log_y_over_4中的较大值
+    uint64_t n = pow(10, max_value);              // 计算n = 10^max_value
+    return n;
+}
 
 int block_init(Block_s *block, size_t bs, bool cursor_init) {
     block->entries = bbq_malloc(sizeof(bbq_data) * bs);

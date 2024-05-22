@@ -9,9 +9,9 @@ list(APPEND SRC_LIST ${SRC_CC_LIST})
 # 指定库路径
 link_directories(${LIB_PATH})
 # 链接静态库
-link_libraries(bbq)
+link_libraries(bbq iniparser)
 # 指定可执行文件输出路径
 set(EXECUTABLE_OUTPUT_PATH ${EXEC_PATH})
 
 add_executable(benchmark_dpdk ${SRC_LIST}) # 添加可执行程序
-target_link_libraries(benchmark_dp pthread) # 链接库
+target_link_libraries(benchmark_dpdk pthread) # 链接库

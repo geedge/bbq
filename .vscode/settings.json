@@ -70,6 +70,10 @@
         "thread": "cpp",
         "variant": "cpp",
         "test.h": "c",
-        "demo.h": "c"
+        "demo.h": "c",
+        "math.h": "c",
+        "stdint.h": "c",
+        "minini.h": "c",
+        "common.h": "c"
     }
 }
