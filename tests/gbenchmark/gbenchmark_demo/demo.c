@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-22 15:59:55
+ * @LastEditTime: 2024-05-22 16:24:29
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -15,7 +15,7 @@
 #include <unistd.h>
 
 void test_func() {
-    printf("zzz\n");
+    printf("hello\n");
 }
 
 // #define NUM_THREADS 4 // 假设我们想要启动的线程数
