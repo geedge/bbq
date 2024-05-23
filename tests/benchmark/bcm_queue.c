@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-23 18:05:44
+ * @LastEditTime: 2024-05-23 18:50:36
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -14,7 +14,6 @@ int bcm_queue_init(bcm_cfg *cfg, bcm_queue_t *q) {
     }
 
     int ret = -1;
-
     switch (cfg->ring_type) {
     case BCM_RING_TYPE_DPDK:
         ret = bcm_queue_init_dpdk(cfg, q);

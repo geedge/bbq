@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-23 16:24:52
+ * @LastEditTime: 2024-05-23 19:26:52
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -69,6 +69,10 @@ int bxm_load_config(const char *config, bcm_cfg *cfg) {
 
     cfg->cores_cnt = iniparser_getint(ini, "base:cores_cnt", 0);
     BBQ_INFO_LOG("cores_cnt:%u", cfg->cores_cnt);
+    if (cfg->cores_cnt <= 2) {
+        BBQ_ERR_LOG("atleast 2 cores");
+        perror("atleast 2 cores");
+    }
 
     cfg->entries_cnt = iniparser_getuint64(ini, "base:entries_cnt", 0);
     BBQ_INFO_LOG("entries_cnt:%u", cfg->entries_cnt);
