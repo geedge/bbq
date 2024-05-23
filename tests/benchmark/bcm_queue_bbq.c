@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-23 17:43:16
+ * @LastEditTime: 2024-05-23 18:03:51
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -20,8 +20,7 @@ int bcm_queue_init_bbq(bcm_cfg *cfg, bcm_queue_t *q) {
 
     q->ring_free_f = (ring_free_func)bbq_ring_free;
     q->enqueue_f = (ring_enqueue_func)bbq_enqueue;
-    // q->dequeue_f = bbq_dequeue();
-    // ring_dequeue_func dequeue_f;
+    q->dequeue_f = (ring_dequeue_func)bbq_dequeue;
 
     return 0;
 }

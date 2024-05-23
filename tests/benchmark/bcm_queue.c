@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-23 17:36:25
+ * @LastEditTime: 2024-05-23 18:05:44
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -27,6 +27,12 @@ int bcm_queue_init(bcm_cfg *cfg, bcm_queue_t *q) {
     }
 
     return ret;
+}
+
+void bcm_queue_destory(bcm_queue_t *q) {
+    if (likely(q != NULL && q->ring_free_f != NULL)) {
+        q->ring_free_f(q->ring);
+    }
 }
 
 // struct rte_ring *rte_ring_create(const char *name, unsigned int count,

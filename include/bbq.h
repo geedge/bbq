@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu@geedgenetworks.com
- * @LastEditTime: 2024-05-23 16:08:55
+ * @LastEditTime: 2024-05-23 18:00:54
  * @Describe:
  */
 
@@ -97,6 +97,6 @@ extern BlockBoundedQueue_s *bbq_ring_create(const char *name, uint32_t count,
 extern BlockBoundedQueue_s *bbq_ring_create_bnbs(const char *name, size_t bn, size_t bs, int socket_id, Policy_e policy);
 extern void bbq_ring_free(BlockBoundedQueue_s *q);
 extern QueueStatus_e bbq_enqueue(BlockBoundedQueue_s *q, bbq_data data);
-extern QueueStatus_s bbq_dequeue(BlockBoundedQueue_s *q);
+extern QueueStatus_e bbq_dequeue(BlockBoundedQueue_s *q, bbq_data *deq_data);
 
 #endif

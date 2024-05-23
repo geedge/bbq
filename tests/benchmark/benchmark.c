@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-23 16:21:17
+ * @LastEditTime: 2024-05-23 18:06:14
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
     if (argc == 2) {
         config = argv[1];
     } else {
-        config = "/root/code/c/bbq-new/tests/benchmark/config/case1.ini";
+        config = "/root/code/c/bbq-ly/tests/benchmark/config/case1.ini";
         BBQ_ERR_LOG("!!!!!! not input config path, use default config:%s", config);
         // sleep(2);
     }
@@ -57,6 +57,7 @@ int main(int argc, char *argv[]) {
     // }
 
     // 输出测试报告
+    BBQ_INFO_LOG("report\n");
 
     return 0;
 }

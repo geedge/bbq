@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-23 16:10:19
+ * @LastEditTime: 2024-05-23 18:01:56
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -59,18 +59,20 @@ TEST(boundary, full_empty) {
     en_status = bbq_enqueue(q, &data[0]);
     EXPECT_TRUE(en_status == FULL) << "FAILED-3";
 
-    QueueStatus_s de_status;
+    QueueStatus_e de_status;
     // 4.出满队列，成功
     for (int i = 0; i < cnt; i++) {
-        de_status = bbq_dequeue(q);
-        EXPECT_TRUE(de_status.status == OK) << "FAILED-4 when dequeue,  i:" << i << " en_status:%d " << en_status;
-        EXPECT_EQ(i, ((testdata_s *)de_status.data)->v1) << "FAILED 5";
-        EXPECT_EQ(i, ((testdata_s *)de_status.data)->v2) << "FAILED 6";
+        bbq_data de_data = NULL;
+        de_status = bbq_dequeue(q, &de_data);
+        EXPECT_TRUE(de_status == OK) << "FAILED-4 when dequeue,  i:" << i << " en_status:%d " << en_status;
+        EXPECT_EQ(i, ((testdata_s *)&de_data)->v1) << "FAILED 5";
+        EXPECT_EQ(i, ((testdata_s *)&de_data)->v2) << "FAILED 6";
     }
 
     // 5.再出队（空），失败
-    de_status = bbq_dequeue(q);
-    EXPECT_TRUE(de_status.status == EMPTY) << "FAILED 7";
+    bbq_data de_data = NULL;
+    de_status = bbq_dequeue(q, &de_data);
+    EXPECT_TRUE(de_status == EMPTY) << "FAILED 7";
 
     bbq_ring_free(q);
 
@@ -303,10 +305,10 @@ void *utest_consumer_thread(void *arg) {
     }
 
     size_t i = 0;
-    QueueStatus_s de_status = {.status = OK};
+    QueueStatus_e status = OK;
     while (true) {
         // 如果==0，则直到队列空了才退出
-        if (tmp_arg->until_end == true && de_status.status == EMPTY) {
+        if (tmp_arg->until_end == true && status == EMPTY) {
             break;
         }
 
@@ -314,11 +316,12 @@ void *utest_consumer_thread(void *arg) {
             break;
         }
 
-        de_status = bbq_dequeue(tmp_arg->q);
-        if (de_status.status == OK) {
-            exit_data->data[exit_data->succ_times] = (*(testdata_s *)de_status.data);
+        bbq_data deq_data = NULL;
+        status = bbq_dequeue(tmp_arg->q, &deq_data);
+        if (status == OK) {
+            exit_data->data[exit_data->succ_times] = (*(testdata_s *)deq_data);
         }
-        utest_thread_exit_data_counter(exit_data, de_status.status);
+        utest_thread_exit_data_counter(exit_data, status);
 
         if (tmp_arg->usleep > 0) {
             usleep(tmp_arg->usleep);

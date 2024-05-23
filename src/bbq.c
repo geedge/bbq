@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-23 17:37:28
+ * @LastEditTime: 2024-05-23 18:03:36
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -168,7 +168,8 @@ QueueStatus_e bbq_enqueue(BlockBoundedQueue_s *q, bbq_data data) {
     }
 }
 
-QueueStatus_s bbq_dequeue(BlockBoundedQueue_s *q) {
+// TODO:入参检查，出队失败，数据设置NULL？
+QueueStatus_e bbq_dequeue(BlockBoundedQueue_s *q, bbq_data *deq_data) {
     while (true) {
         uint64_t ch = atomic_load(&q->chead);
         Block_s *blk = &(q->blocks[idx(q, ch)]);
@@ -176,30 +177,25 @@ QueueStatus_s bbq_dequeue(BlockBoundedQueue_s *q) {
         bbq_data data;
         QueueState_s state;
         state = reserve_entry(q, blk);
-        QueueStatus_s status;
 
         switch (state.state) {
         case RESERVED:
             data = consume_entry(q, &state.e);
             if (data) {
-                status.status = OK;
-                status.data = data;
-                return status;
+                *deq_data = data;
+                return OK;
             } else {
                 continue;
             }
         case NO_ENTRY:
-            status.status = EMPTY;
-            return status;
+            return EMPTY;
         case NOT_AVAILABLE:
-            status.status = BUSY;
-            return status;
+            return BUSY;
         case BLOCK_DONE:
             if (advance_chead(q, ch, state.vsn)) {
                 continue;
             } else {
-                status.status = EMPTY;
-                return status;
+                return EMPTY;
             }
         default:
             BBQ_ERR_LOG("Invalid QueueState in dequeue state: %d", state.state);
