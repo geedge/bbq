@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-22 00:18:56
+ * @LastEditTime: 2024-05-23 16:10:19
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -40,7 +40,7 @@ TEST(boundary, full_empty) {
     int ret = 0;
     BlockBoundedQueue_s *q;
     // 1.初始队列为空，入队失败
-    q = BlockBoundedQueue_create(bn, bs, RETRY_NEW);
+    q = bbq_ring_create_bnbs("bbq_ring", bn, bs, 0, RETRY_NEW);
     EXPECT_TRUE(q != NULL) << "FAILED-1";
 
     int cnt = bn * bs;
@@ -88,7 +88,7 @@ TEST(multi_pc, pquick) {
     uint64_t thread_exec_times = bs * 10;
     pthread_t *threads = NULL; // 存储所有线程ID的数组
 
-    BlockBoundedQueue_s *q = BlockBoundedQueue_create(bn, bs, RETRY_NEW);
+    BlockBoundedQueue_s *q = bbq_ring_create_bnbs("bbq_ring", bn, bs, 0, RETRY_NEW);
     EXPECT_TRUE(q != NULL) << "FAILED-1";
 
     // 创建生产者消费者线程

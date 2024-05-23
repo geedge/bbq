@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-22 19:40:54
+ * @LastEditTime: 2024-05-23 16:10:02
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -26,11 +26,11 @@ static inline void *bbq_memset(void *data, size_t size);
 static inline void bbq_free(void *ptr);
 
 // 根据entries大小返回合理的blocks配置TODO:
-static uint64_t bbq_blocks_calc(uint64_t entries) {
+static uint32_t bbq_blocks_calc(uint32_t entries) {
     double log_entries = log10((double)entries);  // 计算log10(entries)
-    uint64_t over4 = (uint64_t)(log_entries / 4); // 向下取整
-    uint64_t max_value = (over4 > 1) ? over4 : 1; // 取1和log_y_over_4中的较大值
-    uint64_t n = pow(10, max_value);              // 计算n = 10^max_value
+    uint32_t over4 = (uint32_t)(log_entries / 4); // 向下取整
+    uint32_t max_value = (over4 > 1) ? over4 : 1; // 取1和log_y_over_4中的较大值
+    uint32_t n = pow(10, max_value);              // 计算n = 10^max_value
     return n;
 }
 
@@ -77,7 +77,7 @@ unsigned ceil_log2(uint64_t x) {
     return x == 1 ? 0 : floor_log2(x - 1) + 1;
 }
 
-BlockBoundedQueue_s *BlockBoundedQueue_create(size_t bn, size_t bs, Policy_e policy) {
+BlockBoundedQueue_s *bbq_ring_create_bnbs(const char *name, size_t bn, size_t bs, int socket_id, Policy_e policy) {
     int ret = 0;
     BlockBoundedQueue_s *q = bbq_malloc(sizeof(BlockBoundedQueue_s));
     if (q == NULL) {
@@ -115,6 +115,13 @@ BlockBoundedQueue_s *BlockBoundedQueue_create(size_t bn, size_t bs, Policy_e pol
     q->off_mask = (1 << q->off_bits) - 1;
 
     return q;
+}
+
+BlockBoundedQueue_s *bbq_ring_create(const char *name, uint32_t count,
+                                     int socket_id, Policy_e policy) {
+    uint32_t bn = bbq_blocks_calc(count);
+    uint32_t bs = count / bn;
+    return bbq_ring_create_bnbs(name, bn, bs, socket_id, policy);
 }
 
 // TODO:检查队列是否都被消费了再删除？
