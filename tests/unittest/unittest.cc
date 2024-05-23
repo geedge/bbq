@@ -72,8 +72,7 @@ TEST(boundary, full_empty) {
     de_status = bbq_dequeue(q);
     EXPECT_TRUE(de_status.status == EMPTY) << "FAILED 7";
 
-    ret = BlockBoundedQueue_destory(q);
-    EXPECT_TRUE(ret == BBQ_OK) << "FAILED 8";
+    bbq_ring_free(q);
 
     free(data);
 #ifdef BBQ_DEBUG

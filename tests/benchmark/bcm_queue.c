@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-23 16:13:23
+ * @LastEditTime: 2024-05-23 17:36:25
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -20,7 +20,7 @@ int bcm_queue_init(bcm_cfg *cfg, bcm_queue_t *q) {
         ret = bcm_queue_init_dpdk(cfg, q);
         break;
     case BCM_RING_TYPE_BBQ:
-        // ret =bcm_queue_init_bbq(cfg, q);
+        ret = bcm_queue_init_bbq(cfg, q);
         break;
     default:
         return BBQ_UNKNOWN_TYPE;

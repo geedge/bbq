@@ -15,4 +15,4 @@ link_libraries(bbq iniparser)
 set(EXECUTABLE_OUTPUT_PATH ${EXEC_PATH})
 
 add_executable(benchmark ${SRC_LIST}) # 添加可执行程序
-target_link_libraries(benchmark pthread rte_ring rte_eal rte_kvargs rte_telemetry) # 链接库
+target_link_libraries(benchmark pthread rte_ring rte_eal rte_kvargs rte_telemetry m) # 链接库

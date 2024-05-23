@@ -1,10 +1,11 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-23 16:30:47
+ * @LastEditTime: 2024-05-23 17:23:00
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
 
+#include "bbq_error.h"
 #include "bcm_queue.h"
 #include "common.h"
 
@@ -18,8 +19,13 @@ int bcm_queue_init_dpdk(bcm_cfg *cfg, bcm_queue_t *q) {
 
     q->ring_type = BCM_RING_TYPE_DPDK;
     q->dpdk_ring = rte_ring_create("dpdk_ring", cfg->entries_cnt, rte_socket_id(), 0);
+    if (q->dpdk_ring == NULL) {
+        return BBQ_NULL_PTR;
+    }
 
     q->ring_free_f = (ring_free_func)rte_ring_free;
     q->enqueue_f = (ring_enqueue_func)rte_ring_enqueue;
     q->dequeue_f = (ring_dequeue_func)rte_ring_dequeue;
+
+    return BBQ_OK;
 }

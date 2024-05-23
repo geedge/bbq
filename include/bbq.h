@@ -95,7 +95,7 @@ extern BlockBoundedQueue_s *bbq_ring_create(const char *name, uint32_t count,
                                             int socket_id, Policy_e policy);
 
 extern BlockBoundedQueue_s *bbq_ring_create_bnbs(const char *name, size_t bn, size_t bs, int socket_id, Policy_e policy);
-extern int BlockBoundedQueue_destory(BlockBoundedQueue_s *q);
+extern void bbq_ring_free(BlockBoundedQueue_s *q);
 extern QueueStatus_e bbq_enqueue(BlockBoundedQueue_s *q, bbq_data data);
 extern QueueStatus_s bbq_dequeue(BlockBoundedQueue_s *q);
 

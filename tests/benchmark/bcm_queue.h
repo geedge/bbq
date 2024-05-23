@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-23 16:05:56
+ * @LastEditTime: 2024-05-23 17:38:37
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -27,5 +27,6 @@ typedef struct {
 
 extern int bcm_queue_init(bcm_cfg *cfg, bcm_queue_t *q);
 extern int bcm_queue_init_dpdk(bcm_cfg *cfg, bcm_queue_t *q);
+extern int bcm_queue_init_bbq(bcm_cfg *cfg, bcm_queue_t *q);
 
 #endif

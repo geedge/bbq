@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-23 16:10:02
+ * @LastEditTime: 2024-05-23 17:37:28
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -26,7 +26,7 @@ static inline void *bbq_memset(void *data, size_t size);
 static inline void bbq_free(void *ptr);
 
 // 根据entries大小返回合理的blocks配置TODO:
-static uint32_t bbq_blocks_calc(uint32_t entries) {
+uint32_t bbq_blocks_calc(uint32_t entries) {
     double log_entries = log10((double)entries);  // 计算log10(entries)
     uint32_t over4 = (uint32_t)(log_entries / 4); // 向下取整
     uint32_t max_value = (over4 > 1) ? over4 : 1; // 取1和log_y_over_4中的较大值
@@ -103,7 +103,7 @@ BlockBoundedQueue_s *bbq_ring_create_bnbs(const char *name, size_t bn, size_t bs
         ret = block_init(&(q->blocks[i]), bs, cursor_init_flag);
         if (ret != BBQ_OK) {
             BBQ_ERR_LOG("block init error");
-            BlockBoundedQueue_destory(q);
+            bbq_ring_free(q);
             return NULL;
         }
     }
@@ -125,9 +125,9 @@ BlockBoundedQueue_s *bbq_ring_create(const char *name, uint32_t count,
 }
 
 // TODO:检查队列是否都被消费了再删除？
-int BlockBoundedQueue_destory(BlockBoundedQueue_s *q) {
+void bbq_ring_free(BlockBoundedQueue_s *q) {
     if (q == NULL) {
-        return BBQ_NULL_PTR;
+        return;
     }
 
     for (size_t i = 0; i < q->bn; ++i) {
@@ -136,8 +136,6 @@ int BlockBoundedQueue_destory(BlockBoundedQueue_s *q) {
 
     bbq_free(q->blocks);
     bbq_free(q);
-
-    return BBQ_OK;
 }
 
 QueueStatus_e bbq_enqueue(BlockBoundedQueue_s *q, bbq_data data) {
