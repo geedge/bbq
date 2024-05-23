@@ -65,8 +65,8 @@ TEST(boundary, full_empty) {
         bbq_data de_data = NULL;
         de_status = bbq_dequeue(q, &de_data);
         EXPECT_TRUE(de_status == OK) << "FAILED-4 when dequeue,  i:" << i << " en_status:%d " << en_status;
-        EXPECT_EQ(i, ((testdata_s *)&de_data)->v1) << "FAILED 5";
-        EXPECT_EQ(i, ((testdata_s *)&de_data)->v2) << "FAILED 6";
+        EXPECT_EQ(i, ((testdata_s *)de_data)->v1) << "FAILED 5";
+        EXPECT_EQ(i, ((testdata_s *)de_data)->v2) << "FAILED 6";
     }
 
     // 5.再出队（空），失败
