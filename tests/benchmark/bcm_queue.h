@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-24 16:53:30
+ * @LastEditTime: 2024-05-24 19:34:17
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -12,10 +12,14 @@
 typedef void (*bcm_ring_free_f)(void *ring);
 typedef int (*bcm_ring_enqueue_f)(void *ring, void *obj);
 typedef int (*bcm_ring_dequeue_f)(void *ring, void **obj);
+typedef int (*bcm_ring_full_f)(void *ring);
+typedef int (*bcm_ring_empty_f)(void *ring);
 
 typedef struct {
     test_ring_type ring_type;
     bcm_ring_free_f ring_free_f;
+    bcm_ring_full_f ring_full_f;
+    bcm_ring_empty_f ring_empty_f;
     bcm_ring_enqueue_f enqueue_f;
     bcm_ring_dequeue_f dequeue_f;
 

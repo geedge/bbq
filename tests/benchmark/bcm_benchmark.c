@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-24 18:08:38
+ * @LastEditTime: 2024-05-24 19:40:47
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -51,11 +51,17 @@ void bcmbusy_loopof() {
     };
 }
 
-void bcm_wait_all_threads_ready(uint32_t thread_cnt_max) {
+void bcm_wait_all_threads_ready(bcm_exit_data *exit_data) {
+    BBQ_INFO_LOG("wait other thread init....");
+    uint32_t thread_cnt_max = exit_data->arg->cfg->consumer_cnt +
+                              exit_data->arg->cfg->producer_cnt;
+
     atomic_fetch_add(&bcm_thread_now, 1);
     while (atomic_load(&bcm_thread_now) != thread_cnt_max) {
         // 忙等待其他线程准备好
+        sleep(1);
     }
+    BBQ_INFO_LOG("wait other thread init done!");
 }
 
 bcm_exit_data *bcm_exit_data_create(bcm_thread_arg_s *t_arg) {
@@ -84,12 +90,11 @@ void *bcm_thread_producer_start(void *arg) {
     int ret = 0;
     bcm_thread_arg_s *t_arg = (bcm_thread_arg_s *)arg;
     bcm_exit_data *exit_data = bcm_exit_data_create(t_arg);
-    uint32_t thread_cnt_max = t_arg->cfg->consumer_cnt + t_arg->cfg->producer_cnt;
     char thread_name[128] = {0};
     snprintf(thread_name, sizeof(thread_name), "producer:%x", exit_data->thread_id);
     prctl(PR_SET_NAME, thread_name);
 
-    bcm_wait_all_threads_ready(thread_cnt_max);
+    bcm_wait_all_threads_ready(exit_data);
 
     uint64_t en_ok_cnt = 0;
 
@@ -126,13 +131,12 @@ void *bcm_thread_consumer_start(void *arg) {
 
     bcm_thread_arg_s *t_arg = (bcm_thread_arg_s *)arg;
     bcm_exit_data *exit_data = bcm_exit_data_create(t_arg);
-    uint32_t thread_cnt_max = t_arg->cfg->consumer_cnt + t_arg->cfg->producer_cnt;
 
     char thread_name[128] = {0};
     snprintf(thread_name, sizeof(thread_name), "consumer:%x", exit_data->thread_id);
     prctl(PR_SET_NAME, thread_name);
 
-    bcm_wait_all_threads_ready(thread_cnt_max);
+    bcm_wait_all_threads_ready(exit_data);
 
     for (uint64_t i; i < t_arg->cfg->dequeue_cnt; i++) {
         bcm_simple_data *data = NULL;
@@ -219,12 +223,12 @@ pthread_t *bcm_threads_creat(test_cfg *cfg, bcm_queue_t *q) {
             CORE_ID_CHK_SET(core_id, cfg->cores_cnt);
         }
 
-        for (int i = 0; i < pcnt; i++, pcnt--) {
+        for (int i = 0; i < pcnt; i++) {
             bcm_one_thread_creat(cfg, q, TEST_THREAD_PRODUCER, core_id, &(threads[thread_id++]));
             CORE_ID_CHK_SET(core_id, cfg->cores_cnt);
         }
 
-        for (int i = 0; i < ccnt; i++, ccnt--) {
+        for (int i = 0; i < ccnt; i++) {
             bcm_one_thread_creat(cfg, q, TEST_THREAD_CONSUMER, core_id, &(threads[thread_id++]));
             CORE_ID_CHK_SET(core_id, cfg->cores_cnt);
         }

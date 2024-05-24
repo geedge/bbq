@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-24 17:33:05
+ * @LastEditTime: 2024-05-24 19:35:33
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -17,7 +17,7 @@ int bcm_queue_init_dpdk(test_cfg *cfg, bcm_queue_t *q) {
     }
 
     q->ring_type = TEST_RING_TYPE_DPDK;
-    q->dpdk_ring = rte_ring_create("dpdk_ring", cfg->entries_cnt, rte_socket_id(), 0);
+    q->dpdk_ring = rte_ring_create("dpdk_ring", cfg->entries_cnt, rte_socket_id(), RING_F_MP_RTS_ENQ | RING_F_MC_RTS_DEQ);
     if (q->dpdk_ring == NULL) {
         return BBQ_NULL_PTR;
     }
@@ -25,6 +25,8 @@ int bcm_queue_init_dpdk(test_cfg *cfg, bcm_queue_t *q) {
     q->ring_free_f = (bcm_ring_free_f)rte_ring_free;
     q->enqueue_f = (bcm_ring_enqueue_f)rte_ring_enqueue;
     q->dequeue_f = (bcm_ring_dequeue_f)rte_ring_dequeue;
+    // q->ring_full_f = (bcm_ring_dequeue_f)rte_ring_full;
+    // q->ring_empty_f = (bcm_ring_dequeue_f)rte_ring_empty;
 
     return BBQ_OK;
 }
