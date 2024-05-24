@@ -33,6 +33,3 @@ void bcm_queue_destory(bcm_queue_t *q) {
         q->ring_free_f(q->ring);
     }
 }
-
-// struct rte_ring *rte_ring_create(const char *name, unsigned int count,
-//                                  int socket_id, unsigned int flags);

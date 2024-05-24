@@ -1,12 +1,12 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-24 11:50:20
+ * @LastEditTime: 2024-05-24 14:13:49
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
 
-#include "bbq_common.h"
 #include "bbq_errno.h"
+#include "bcm_common.h"
 #include "bcm_queue.h"
 
 int bcm_queue_init_dpdk(bcm_cfg *cfg, bcm_queue_t *q) {
@@ -23,9 +23,9 @@ int bcm_queue_init_dpdk(bcm_cfg *cfg, bcm_queue_t *q) {
         return BBQ_NULL_PTR;
     }
 
-    q->ring_free_f = (ring_free_func)rte_ring_free;
-    q->enqueue_f = (ring_enqueue_func)rte_ring_enqueue;
-    q->dequeue_f = (ring_dequeue_func)rte_ring_dequeue;
+    q->ring_free_f = (bcm_ring_free_f)rte_ring_free;
+    q->enqueue_f = (bcm_ring_enqueue_f)rte_ring_enqueue;
+    q->dequeue_f = (bcm_ring_dequeue_f)rte_ring_dequeue;
 
     return BBQ_OK;
 }

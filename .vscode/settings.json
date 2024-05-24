@@ -85,6 +85,7 @@
         "rte_ring.h": "c",
         "bcm_queue_dpdk.h": "c",
         "stdlib.h": "c",
-        "bbq_common.h": "c"
+        "bbq_common.h": "c",
+        "bcm_common.h": "c"
     }
 }

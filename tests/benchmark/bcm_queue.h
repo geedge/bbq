@@ -1,23 +1,23 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-23 17:38:37
+ * @LastEditTime: 2024-05-24 14:17:13
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
 #ifndef _BCM_QUEUE_H_
 #define _BCM_QUEUE_H_
-#include "bbq_common.h"
+#include "bcm_common.h"
 #include "rte_ring.h"
 
-typedef void (*ring_free_func)(void *ring);
-typedef int (*ring_enqueue_func)(void *ring, void *obj);
-typedef int (*ring_dequeue_func)(void *ring, void **obj);
+typedef void (*bcm_ring_free_f)(void *ring);
+typedef int (*bcm_ring_enqueue_f)(void *ring, void *obj);
+typedef int (*bcm_ring_dequeue_f)(void *ring, void **obj);
 
 typedef struct {
     bcm_ring_type ring_type;
-    ring_free_func ring_free_f;
-    ring_enqueue_func enqueue_f;
-    ring_dequeue_func dequeue_f;
+    bcm_ring_free_f ring_free_f;
+    bcm_ring_enqueue_f enqueue_f;
+    bcm_ring_dequeue_f dequeue_f;
 
     union {
         void *ring;

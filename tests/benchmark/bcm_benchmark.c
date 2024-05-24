@@ -1,12 +1,12 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-24 14:09:15
+ * @LastEditTime: 2024-05-24 14:15:36
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
 #include "bbq.h"
+#include "bcm_common.h"
 #include "bcm_queue.h"
-#include "bbq_common.h"
 #include "iniparser.h"
 #include <pthread.h>
 #include <stdatomic.h>
@@ -41,7 +41,7 @@ typedef struct {
 } bcm_exit_data;
 
 // 记录已启动的线程
-atomic_uint thread_cnt_now = 0;
+atomic_uint bcm_thread_now = 0;
 
 void bcmbusy_loopof() {
     uint32_t loop = 0;
@@ -51,13 +51,13 @@ void bcmbusy_loopof() {
 }
 
 void bcm_wait_all_threads_ready(uint32_t thread_cnt_max) {
-    atomic_fetch_add(&thread_cnt_now, 1);
-    while (atomic_load(&thread_cnt_now) != thread_cnt_max) {
+    atomic_fetch_add(&bcm_thread_now, 1);
+    while (atomic_load(&bcm_thread_now) != thread_cnt_max) {
         // 忙等待其他线程准备好
     }
 }
 
-bcm_exit_data *exit_data_create(bcm_thread_arg_s *t_arg) {
+bcm_exit_data *bcm_exit_data_create(bcm_thread_arg_s *t_arg) {
     bcm_exit_data *exit_data = (bcm_exit_data *)malloc(sizeof(bcm_exit_data));
     if (exit_data == NULL) {
         BBQ_ERR_LOG("malloc failed");
@@ -73,7 +73,7 @@ bcm_exit_data *exit_data_create(bcm_thread_arg_s *t_arg) {
     return exit_data;
 }
 
-bcm_exit_data *exit_data_destory(bcm_exit_data *data) {
+bcm_exit_data *bcm_exit_data_destory(bcm_exit_data *data) {
     if (data->arg->ttype == BCM_CONSUMER && data->complex_data.data != NULL) {
         free(data->complex_data.data);
     }
@@ -81,10 +81,10 @@ bcm_exit_data *exit_data_destory(bcm_exit_data *data) {
     free(data);
 }
 
-void *thread_producer_start(void *arg) {
+void *bcm_thread_producer_start(void *arg) {
     int ret = 0;
     bcm_thread_arg_s *t_arg = (bcm_thread_arg_s *)arg;
-    bcm_exit_data *exit_data = exit_data_create(t_arg);
+    bcm_exit_data *exit_data = bcm_exit_data_create(t_arg);
     uint32_t thread_cnt_max = t_arg->cfg->consumer_cnt + t_arg->cfg->producer_cnt;
     bcm_wait_all_threads_ready(thread_cnt_max);
 
@@ -109,10 +109,10 @@ void *thread_producer_start(void *arg) {
     pthread_exit(exit_data);
 }
 
-void *thread_consumer_start(void *arg) {
+void *bcm_thread_consumer_start(void *arg) {
     int ret = 0;
     bcm_thread_arg_s *t_arg = (bcm_thread_arg_s *)arg;
-    bcm_exit_data *exit_data = exit_data_create(t_arg);
+    bcm_exit_data *exit_data = bcm_exit_data_create(t_arg);
     uint32_t thread_cnt_max = t_arg->cfg->consumer_cnt + t_arg->cfg->producer_cnt;
     bcm_wait_all_threads_ready(thread_cnt_max);
 
@@ -145,9 +145,9 @@ bcm_one_thread_creat(bcm_cfg *cfg, bcm_queue_t *q, bcm_threadtype_e ttype, int c
     arg->core = core;
 
     if (ttype == BCM_PRODUCER) {
-        pthread_create(thread, NULL, thread_producer_start, arg);
+        pthread_create(thread, NULL, bcm_thread_producer_start, arg);
     } else {
-        pthread_create(thread, NULL, thread_consumer_start, arg);
+        pthread_create(thread, NULL, bcm_thread_consumer_start, arg);
     }
 }
 
@@ -263,7 +263,7 @@ int main(int argc, char *argv[]) {
 
     // 回收、释放数据
     for (i = 0; i < thread_cnt; i++) {
-        exit_data_destory(exit_data[i]);
+        bcm_exit_data_destory(exit_data[i]);
     }
 
     // 输出测试报告

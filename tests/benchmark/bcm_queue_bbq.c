@@ -5,7 +5,7 @@
  * @Describe: TODO
  */
 #include "bbq.h"
-#include "bbq_common.h"
+#include "bcm_common.h"
 #include "bcm_queue.h"
 #include <math.h>
 
@@ -18,9 +18,9 @@ int bcm_queue_init_bbq(bcm_cfg *cfg, bcm_queue_t *q) {
         return BBQ_NULL_PTR;
     }
 
-    q->ring_free_f = (ring_free_func)bbq_ring_free;
-    q->enqueue_f = (ring_enqueue_func)bbq_enqueue;
-    q->dequeue_f = (ring_dequeue_func)bbq_dequeue;
+    q->ring_free_f = (bcm_ring_free_f)bbq_ring_free;
+    q->enqueue_f = (bcm_ring_enqueue_f)bbq_enqueue;
+    q->dequeue_f = (bcm_ring_dequeue_f)bbq_dequeue;
 
     return 0;
 }
