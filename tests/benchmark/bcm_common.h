@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-24 10:14:57
+ * @LastEditTime: 2024-05-24 16:26:41
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -8,7 +8,6 @@
 #define _BBQ_COMMON_H_
 
 #include <stdint.h>
-#include <time.h>
 
 typedef enum {
     BCM_RING_TYPE_BBQ,
@@ -45,13 +44,6 @@ typedef struct {
     uint64_t oversubscription; // 比核心/超线程更多的生产者和消费者的吞吐量
 } bcm_report;
 
-typedef struct {
-    struct timespec st; // 系统时间戳
-    // uint64_t cycles;     // cpu运行的cycle
-} bcm_time_metric;
-
 extern int bxm_load_config(const char *config, bcm_cfg *cfg);
-extern bcm_time_metric clock_time_get();
-extern time_t clock_nstime_diff(bcm_time_metric *slow, bcm_time_metric *fast);
 
 #endif

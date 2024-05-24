@@ -3,8 +3,15 @@ project(BBQ_UNITTEST)
 
 # 搜索当前cmake文件所在目录下的c文件
 file(GLOB SRC_LIST "${CMAKE_CURRENT_SOURCE_DIR}/*.cc")
+file(GLOB SRC_COMMON_LIST "${CMAKE_CURRENT_SOURCE_DIR}/../*.c")
+list(APPEND SRC_LIST ${SRC_COMMON_LIST})
+
 # 指定库路径
 link_directories(${LIB_PATH})
+# 指定头文件
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/../
+)
 # 链接静态库
 link_libraries(bbq)
 # 指定可执行文件输出路径

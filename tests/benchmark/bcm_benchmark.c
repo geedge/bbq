@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-24 16:10:32
+ * @LastEditTime: 2024-05-24 16:27:30
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -8,6 +8,7 @@
 #include "bcm_common.h"
 #include "bcm_queue.h"
 #include "iniparser.h"
+#include "test_common.h"
 #include <pthread.h>
 #include <stdatomic.h>
 #include <stdlib.h>

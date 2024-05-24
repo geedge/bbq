@@ -7,6 +7,7 @@
 #ifndef _BCM_QUEUE_H_
 #define _BCM_QUEUE_H_
 #include "bcm_common.h"
+#include "test_common.h"
 #include "rte_ring.h"
 
 typedef void (*bcm_ring_free_f)(void *ring);

@@ -5,7 +5,6 @@ project(BBQ_TOP)
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/iniparser
-    "/root/code/c/dpdk-23.07/install/include"
 ) 
 
 # 设置输出目录

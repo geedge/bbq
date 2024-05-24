@@ -1,10 +1,12 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-24 14:13:55
+ * @LastEditTime: 2024-05-24 16:27:36
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
 #include "bcm_common.h"
+#include "test_common.h"
+
 #include "bbq_log.h"
 #include "iniparser.h"
 // #include <linux/time.h>
@@ -28,22 +30,6 @@ bcm_ring_type bcm_ring_type_str2enum(const char *ring_type) {
     }
 
     return BCM_RING_TYPE_MAX;
-}
-
-bcm_time_metric clock_time_get() {
-    bcm_time_metric metric = {0};
-    struct timespec st;
-
-    clock_gettime(CLOCK_MONOTONIC, &metric.st);
-
-    return metric;
-}
-
-time_t clock_nstime_diff(bcm_time_metric *slow, bcm_time_metric *fast) {
-    time_t time_ns_fast = fast->st.tv_sec * 1000 * 1000 * 1000 + fast->st.tv_nsec;
-    time_t time_ns_slow = slow->st.tv_sec * 1000 * 1000 * 1000 + slow->st.tv_nsec;
-
-    return time_ns_fast - time_ns_slow;
 }
 
 int bxm_load_config(const char *config, bcm_cfg *cfg) {
