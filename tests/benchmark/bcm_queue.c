@@ -15,10 +15,10 @@ int bcm_queue_init(bcm_cfg *cfg, bcm_queue_t *q) {
 
     int ret = -1;
     switch (cfg->ring_type) {
-    case BCM_RING_TYPE_DPDK:
+    case TEST_RING_TYPE_DPDK:
         ret = bcm_queue_init_dpdk(cfg, q);
         break;
-    case BCM_RING_TYPE_BBQ:
+    case TEST_RING_TYPE_BBQ:
         ret = bcm_queue_init_bbq(cfg, q);
         break;
     default:

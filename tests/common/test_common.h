@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-24 16:52:28
+ * @LastEditTime: 2024-05-24 17:08:58
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -31,20 +31,20 @@ typedef struct {
 } test_report;
 
 typedef enum {
-    BCM_WORKLOAD_SIMPLE,  // 简单负载，每个生产者或消费者都有自己的线程，它们在循环中不断执行入队或出队操作。每次出队后都会验证数据。
-    BCM_WORKLOAD_COMPLEX, // 复杂负载，基于简单工作负载。生产者和消费者为数据分配空间，执行入队和出队，然后手动释放
-    BCM_WORKLOAD_MAX,
-} bcm_workload_e;
+    TEST_WORKLOAD_SIMPLE,  // 简单负载，每个生产者或消费者都有自己的线程，它们在循环中不断执行入队或出队操作。每次出队后都会验证数据。
+    TEST_WORKLOAD_COMPLEX, // 复杂负载，基于简单工作负载。生产者和消费者为数据分配空间，执行入队和出队，然后手动释放
+    TEST_WORKLOAD_MAX,
+} test_workload_e;
 
 typedef enum {
-    BCM_RING_TYPE_BBQ,
-    BCM_RING_TYPE_DPDK,
-    BCM_RING_TYPE_MAX,
-} bcm_ring_type;
+    TEST_RING_TYPE_BBQ,
+    TEST_RING_TYPE_DPDK,
+    TEST_RING_TYPE_MAX,
+} test_ring_type;
 
 typedef struct {
-    char *introduce;         // 测试配置说明
-    bcm_workload_e workload; // 负载模式
+    char *introduce;          // 测试配置说明
+    test_workload_e workload; // 负载模式
 
     uint16_t cores_cnt;    // 测试用核心个数
     uint32_t producer_cnt; // 生产者个数
@@ -52,11 +52,13 @@ typedef struct {
     uint64_t enqueue_cnt;  // 每个线程入队次数
     uint64_t dequeue_cnt;  // 每个线程出队次数
 
-    bcm_ring_type ring_type; // ring buffer类型
-    uint64_t entries_cnt;    // ring初始化时分配entry的个数
+    test_ring_type ring_type; // ring buffer类型
+    uint64_t entries_cnt;     // ring初始化时分配entry的个数
 } bcm_cfg;
 
 extern test_time_metric clock_time_get();
 extern time_t clock_nstime_diff(test_time_metric *slow, test_time_metric *fast);
 extern int bxm_load_config(const char *config, bcm_cfg *cfg);
+extern test_workload_e bcm_workload_str2enum(const char *workload);
+extern test_ring_type bcm_ring_type_str2enum(const char *ring_type);
 #endif

@@ -14,7 +14,7 @@ typedef int (*bcm_ring_enqueue_f)(void *ring, void *obj);
 typedef int (*bcm_ring_dequeue_f)(void *ring, void **obj);
 
 typedef struct {
-    bcm_ring_type ring_type;
+    test_ring_type ring_type;
     bcm_ring_free_f ring_free_f;
     bcm_ring_enqueue_f enqueue_f;
     bcm_ring_dequeue_f dequeue_f;

@@ -86,7 +86,7 @@ void *bcm_thread_producer_start(void *arg) {
     uint32_t thread_cnt_max = t_arg->cfg->consumer_cnt + t_arg->cfg->producer_cnt;
     bcm_wait_all_threads_ready(thread_cnt_max);
 
-    if (t_arg->cfg->workload == BCM_WORKLOAD_SIMPLE) {
+    if (t_arg->cfg->workload == TEST_WORKLOAD_SIMPLE) {
         t_arg->q->enqueue_f(t_arg->q->ring, &(exit_data->simple_data));
     } else {
         bcm_simple_data *data = bbq_malloc(BBQ_MODULE_BCM, sizeof(bcm_simple_data));
@@ -122,7 +122,7 @@ void *bcm_thread_consumer_start(void *arg) {
             perror("the obtained data is not consistent with the expectation");
         }
 
-        if (t_arg->cfg->workload == BCM_WORKLOAD_COMPLEX) {
+        if (t_arg->cfg->workload == TEST_WORKLOAD_COMPLEX) {
             exit_data->complex_data.data[exit_data->complex_data.data_cnt++] = *data;
             bbq_free(BBQ_MODULE_BCM, data);
             bcmbusy_loopof();

@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-24 16:27:36
+ * @LastEditTime: 2024-05-24 17:05:33
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -8,28 +8,7 @@
 
 #include "bbq_log.h"
 #include "iniparser.h"
-// #include <linux/time.h>
 #include <string.h>
-
-bcm_workload_e bcm_workload_str2enum(const char *workload) {
-    if (strcmp(workload, "simple") == 0) {
-        return BCM_WORKLOAD_SIMPLE;
-    } else if (strcmp(workload, "complex") == 0) {
-        return BCM_WORKLOAD_COMPLEX;
-    }
-
-    return BCM_WORKLOAD_MAX;
-}
-
-bcm_ring_type bcm_ring_type_str2enum(const char *ring_type) {
-    if (strcmp(ring_type, "bbq") == 0) {
-        return BCM_RING_TYPE_BBQ;
-    } else if (strcmp(ring_type, "dpdk") == 0) {
-        return BCM_RING_TYPE_DPDK;
-    }
-
-    return BCM_RING_TYPE_MAX;
-}
 
 int bxm_load_config(const char *config, bcm_cfg *cfg) {
     // 加载配置

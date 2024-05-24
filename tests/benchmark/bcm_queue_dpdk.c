@@ -18,7 +18,7 @@ int bcm_queue_init_dpdk(bcm_cfg *cfg, bcm_queue_t *q) {
         rte_exit(EXIT_FAILURE, "Error with EAL init\n");
     }
 
-    q->ring_type = BCM_RING_TYPE_DPDK;
+    q->ring_type = TEST_RING_TYPE_DPDK;
     q->dpdk_ring = rte_ring_create("dpdk_ring", cfg->entries_cnt, rte_socket_id(), 0);
     if (q->dpdk_ring == NULL) {
         return BBQ_NULL_PTR;
