@@ -5,9 +5,9 @@
  * @Describe: TODO
  */
 
+#include "bbq_common.h"
 #include "bbq_errno.h"
 #include "bcm_queue.h"
-#include "common.h"
 
 int bcm_queue_init_dpdk(bcm_cfg *cfg, bcm_queue_t *q) {
     char *argv[1] = {"bcm_dpdk"};

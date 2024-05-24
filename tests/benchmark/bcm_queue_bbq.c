@@ -1,12 +1,12 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-23 18:03:51
+ * @LastEditTime: 2024-05-24 14:09:23
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
 #include "bbq.h"
+#include "bbq_common.h"
 #include "bcm_queue.h"
-#include "common.h"
 #include <math.h>
 
 int bcm_queue_init_bbq(bcm_cfg *cfg, bcm_queue_t *q) {

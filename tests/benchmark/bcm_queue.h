@@ -6,7 +6,7 @@
  */
 #ifndef _BCM_QUEUE_H_
 #define _BCM_QUEUE_H_
-#include "common.h"
+#include "bbq_common.h"
 #include "rte_ring.h"
 
 typedef void (*ring_free_func)(void *ring);

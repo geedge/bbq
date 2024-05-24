@@ -3,8 +3,8 @@
  * @LastEditTime: 2024-05-24 12:03:31
  * @Describe:
  */
-#ifndef _BBQ_ERROR_H_
-#define _BBQ_ERROR_H_
+#ifndef _BBQ_ERRNO_H_
+#define _BBQ_ERRNO_H_
 
 // 通用返回码
 #define BBQ_OK 0            // 成功

@@ -4,7 +4,7 @@
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
-#include "common.h"
+#include "bbq_common.h"
 #include "bbq_log.h"
 #include "iniparser.h"
 // #include <linux/time.h>

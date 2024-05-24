@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-24 13:49:32
+ * @LastEditTime: 2024-05-24 14:06:21
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -26,7 +26,7 @@ static inline void *bbq_memset(void *data, size_t size);
 static inline void bbq_free(void *ptr);
 
 // 根据entries大小返回合理的blocks配置TODO:
-uint32_t bbq_blocks_calc(uint32_t entries) {
+static uint32_t bbq_blocks_calc(uint32_t entries) {
     double log_entries = log10((double)entries);  // 计算log10(entries)
     uint32_t over4 = (uint32_t)(log_entries / 4); // 向下取整
     uint32_t max_value = (over4 > 1) ? over4 : 1; // 取1和log_y_over_4中的较大值
@@ -34,7 +34,7 @@ uint32_t bbq_blocks_calc(uint32_t entries) {
     return n;
 }
 
-int block_init(bbq_block_s *block, size_t bs, bool cursor_init) {
+static int block_init(bbq_block_s *block, size_t bs, bool cursor_init) {
     block->entries = bbq_malloc(sizeof(bbq_data) * bs);
     if (block->entries == NULL) {
         BBQ_ERR_LOG("bbq_malloc error");
@@ -56,7 +56,7 @@ int block_init(bbq_block_s *block, size_t bs, bool cursor_init) {
     return BBQ_OK;
 }
 
-void block_cleanup(bbq_block_s *block, size_t bs) {
+static void block_cleanup(bbq_block_s *block, size_t bs) {
     bbq_free(block->entries);
     block->entries = NULL;
 }
@@ -66,14 +66,14 @@ void block_cleanup(bbq_block_s *block, size_t bs) {
 // 例如：x=1，return 0 (...1)
 // x=3，return 1  （..11）
 // x=9，return 3  （1..1）
-unsigned floor_log2(uint64_t x) {
+static unsigned floor_log2(uint64_t x) {
     return x == 1 ? 0 : 1 + floor_log2(x >> 1);
 }
 
 // 返回以2为底的对数并向上取整值。
 // 例如：x=1，return 0 （2^0=1）
 // x=99， return 7（2^6=64  2^7=128）
-unsigned ceil_log2(uint64_t x) {
+static unsigned ceil_log2(uint64_t x) {
     return x == 1 ? 0 : floor_log2(x - 1) + 1;
 }
 
@@ -118,7 +118,7 @@ bbq_queue_s *bbq_ring_create_bnbs(const char *name, size_t bn, size_t bs, int so
 }
 
 bbq_queue_s *bbq_ring_create(const char *name, uint32_t count,
-                                     int socket_id, bbq_policy_e policy) {
+                             int socket_id, bbq_policy_e policy) {
     uint32_t bn = bbq_blocks_calc(count);
     uint32_t bs = count / bn;
     return bbq_ring_create_bnbs(name, bn, bs, socket_id, policy);
@@ -445,8 +445,10 @@ static inline void bbq_free(void *ptr) {
 
 void bbq_memory_info() {
 #ifdef BBQ_MEMORY
-    BBQ_DBG_LOG("malloc cnt:%lu", atomic_load(&malloc_cnt));
-    BBQ_DBG_LOG("free cnt:%lu", atomic_load(&free_cnt));
+    BBQ_INFO_LOG("malloc cnt:%lu", atomic_load(&malloc_cnt));
+    BBQ_INFO_LOG("free cnt:%lu", atomic_load(&free_cnt));
+#else
+    BBQ_INFO_LOG("BBQ_MEMORY is not define");
 #endif
 }
 
@@ -454,6 +456,7 @@ bool bbq_malloc_free_equal() {
 #ifdef BBQ_MEMORY
     return atomic_load(&malloc_cnt) == atomic_load(&free_cnt);
 #else
+    BBQ_INFO_LOG("BBQ_MEMORY is not define");
     return true;
 #endif
 }
