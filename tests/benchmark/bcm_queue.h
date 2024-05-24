@@ -1,14 +1,13 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-24 14:17:13
+ * @LastEditTime: 2024-05-24 16:53:30
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
 #ifndef _BCM_QUEUE_H_
 #define _BCM_QUEUE_H_
-#include "bcm_common.h"
-#include "test_common.h"
 #include "rte_ring.h"
+#include "test_common.h"
 
 typedef void (*bcm_ring_free_f)(void *ring);
 typedef int (*bcm_ring_enqueue_f)(void *ring, void *obj);

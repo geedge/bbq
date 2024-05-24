@@ -1,11 +1,10 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-24 16:27:30
+ * @LastEditTime: 2024-05-24 16:53:22
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
 #include "bbq.h"
-#include "bcm_common.h"
 #include "bcm_queue.h"
 #include "iniparser.h"
 #include "test_common.h"
@@ -14,13 +13,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-typedef enum {
-    BCM_PRODUCER,
-    BCM_CONSUMER,
-} bcm_threadtype_e;
-
 typedef struct {
-    bcm_threadtype_e ttype;
+    test_thread_type_e ttype;
     int core;
     bcm_cfg *cfg;
     bcm_queue_t *q;
@@ -139,7 +133,7 @@ void *bcm_thread_consumer_start(void *arg) {
 }
 
 pthread_t *
-bcm_one_thread_creat(bcm_cfg *cfg, bcm_queue_t *q, bcm_threadtype_e ttype, int core, pthread_t *thread) {
+bcm_one_thread_creat(bcm_cfg *cfg, bcm_queue_t *q, test_thread_type_e ttype, int core, pthread_t *thread) {
     BBQ_INFO_LOG("thread type:%d core:%d", ttype, core);
 
     bcm_thread_arg_s *arg = (bcm_thread_arg_s *)bbq_malloc(BBQ_MODULE_BCM, sizeof(bcm_thread_arg_s)); // 线程回收时free
@@ -148,7 +142,7 @@ bcm_one_thread_creat(bcm_cfg *cfg, bcm_queue_t *q, bcm_threadtype_e ttype, int c
     arg->ttype = ttype;
     arg->core = core;
 
-    if (ttype == BCM_PRODUCER) {
+    if (ttype == TEST_THREAD_PRODUCER) {
         pthread_create(thread, NULL, bcm_thread_producer_start, arg);
     } else {
         pthread_create(thread, NULL, bcm_thread_consumer_start, arg);
@@ -173,17 +167,17 @@ pthread_t *bcm_threads_creat(bcm_cfg *cfg, bcm_queue_t *q) {
     // 如果数量不同，则在最后分配剩余部分。
     if (cfg->producer_cnt == 1 && cfg->consumer_cnt >= 1) {
         // SPMC，第一个核心给生产者，其他分配给消费者
-        bcm_one_thread_creat(cfg, q, BCM_PRODUCER, core_id, &(threads[thread_id++]));
+        bcm_one_thread_creat(cfg, q, TEST_THREAD_PRODUCER, core_id, &(threads[thread_id++]));
         for (int i = 0; i < cfg->consumer_cnt; i++) {
             CORE_ID_CHK_SET(core_id, cfg->cores_cnt);
-            bcm_one_thread_creat(cfg, q, BCM_CONSUMER, core_id, &(threads[thread_id++]));
+            bcm_one_thread_creat(cfg, q, TEST_THREAD_CONSUMER, core_id, &(threads[thread_id++]));
         }
     } else if (cfg->consumer_cnt == 1 && cfg->producer_cnt >= 1) {
         // MPSC，第一个核心给消费者，其他分配给生产者
-        bcm_one_thread_creat(cfg, q, BCM_CONSUMER, core_id, &(threads[thread_id++]));
+        bcm_one_thread_creat(cfg, q, TEST_THREAD_CONSUMER, core_id, &(threads[thread_id++]));
         for (int i = 0; i < cfg->producer_cnt; i++) {
             CORE_ID_CHK_SET(core_id, cfg->cores_cnt);
-            bcm_one_thread_creat(cfg, q, BCM_PRODUCER, core_id, &(threads[thread_id++]));
+            bcm_one_thread_creat(cfg, q, TEST_THREAD_PRODUCER, core_id, &(threads[thread_id++]));
         }
     } else {
         // MPMC 或 只有生产者 或这有消费者，核心交错分配
@@ -192,22 +186,22 @@ pthread_t *bcm_threads_creat(bcm_cfg *cfg, bcm_queue_t *q) {
         for (core_id = 0; core_id < cfg->cores_cnt && pcnt > 0 && ccnt > 0;) {
             if ((core_id & 1) == 0) {
                 // 偶数
-                bcm_one_thread_creat(cfg, q, BCM_PRODUCER, core_id, &(threads[thread_id++]));
+                bcm_one_thread_creat(cfg, q, TEST_THREAD_PRODUCER, core_id, &(threads[thread_id++]));
                 pcnt--;
             } else {
-                bcm_one_thread_creat(cfg, q, BCM_CONSUMER, core_id, &(threads[thread_id++]));
+                bcm_one_thread_creat(cfg, q, TEST_THREAD_CONSUMER, core_id, &(threads[thread_id++]));
                 ccnt--;
             }
             CORE_ID_CHK_SET(core_id, cfg->cores_cnt);
         }
 
         for (int i = 0; i < pcnt; i++, pcnt--) {
-            bcm_one_thread_creat(cfg, q, BCM_PRODUCER, core_id, &(threads[thread_id++]));
+            bcm_one_thread_creat(cfg, q, TEST_THREAD_PRODUCER, core_id, &(threads[thread_id++]));
             CORE_ID_CHK_SET(core_id, cfg->cores_cnt);
         }
 
         for (int i = 0; i < ccnt; i++, ccnt--) {
-            bcm_one_thread_creat(cfg, q, BCM_CONSUMER, core_id, &(threads[thread_id++]));
+            bcm_one_thread_creat(cfg, q, TEST_THREAD_CONSUMER, core_id, &(threads[thread_id++]));
             CORE_ID_CHK_SET(core_id, cfg->cores_cnt);
         }
     }
@@ -220,7 +214,7 @@ void bcm_threads_destory(pthread_t *threads) {
 }
 
 void bcm_report_generate(bcm_exit_data **exit_data, uint32_t thread_cnt) {
-    // bcm_report report;
+    // test_report report;
     for (uint32_t i = 0; i < thread_cnt; i++) {
         BBQ_INFO_LOG("[%d] thread_id:%u", i, exit_data[i]->thread_id);
     }

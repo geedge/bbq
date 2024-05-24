@@ -4,7 +4,6 @@
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
-#include "bcm_common.h"
 #include "test_common.h"
 
 #include "bbq_log.h"

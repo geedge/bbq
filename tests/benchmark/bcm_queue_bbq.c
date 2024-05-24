@@ -1,11 +1,10 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-24 16:27:39
+ * @LastEditTime: 2024-05-24 16:53:25
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
 #include "bbq.h"
-#include "bcm_common.h"
 #include "test_common.h"
 
 #include "bcm_queue.h"

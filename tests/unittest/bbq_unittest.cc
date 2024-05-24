@@ -110,17 +110,17 @@ TEST(multi_pc, pquick) {
     pthread_join(last_thread, (void **)(&exit_data[i])); // 等待线程结束
 
     // 聚合所有数据
-    thread_data_s merge_data[THREAD_TYPE_MAX];
+    thread_data_s merge_data[TEST_THREAD_TYPE_MAX];
     memset(merge_data, 0, sizeof(merge_data));
-    merge_data[THREAD_PRODUCER].type = THREAD_PRODUCER;
-    merge_data[THREAD_CONSUMER].type = THREAD_CONSUMER;
+    merge_data[TEST_THREAD_PRODUCER].type = TEST_THREAD_PRODUCER;
+    merge_data[TEST_THREAD_CONSUMER].type = TEST_THREAD_CONSUMER;
 
     for (i = 0; i < (thread_cnt + 1); i++) {
         utest_thread_exit_merge_counter(merge_data, exit_data[i]);
     }
 
-    thread_data_s *merge_pdata = &merge_data[THREAD_PRODUCER];
-    thread_data_s *merge_cdata = &merge_data[THREAD_CONSUMER];
+    thread_data_s *merge_pdata = &merge_data[TEST_THREAD_PRODUCER];
+    thread_data_s *merge_cdata = &merge_data[TEST_THREAD_CONSUMER];
     if (merge_pdata->succ_times) {
         merge_pdata->data = (testdata_s *)malloc(merge_pdata->succ_times * sizeof(testdata_s));
     }
@@ -131,12 +131,12 @@ TEST(multi_pc, pquick) {
     uint64_t merge_pdata_idx = 0;
     uint64_t merge_cdata_idx = 0;
     for (i = 0; i < (thread_cnt + 1); i++) {
-        if (exit_data[i]->type == THREAD_PRODUCER && merge_pdata->data != NULL) {
+        if (exit_data[i]->type == TEST_THREAD_PRODUCER && merge_pdata->data != NULL) {
             memcpy(&merge_pdata->data[merge_pdata_idx],
                    exit_data[i]->data,
                    sizeof(merge_pdata->data[merge_pdata_idx]));
             merge_pdata_idx++;
-        } else if (exit_data[i]->type == THREAD_CONSUMER && merge_cdata->data != NULL) {
+        } else if (exit_data[i]->type == TEST_THREAD_CONSUMER && merge_cdata->data != NULL) {
             memcpy(&merge_cdata->data[merge_cdata_idx],
                    exit_data[i]->data,
                    sizeof(merge_cdata->data[merge_cdata_idx]));
@@ -167,7 +167,7 @@ TEST(multi_pc, pquick) {
 
 /*-----------------------------------------------------------------------------*/
 
-thread_data_s *utest_thread_exit_data_init(thread_arg_s *arg, thread_type type) {
+thread_data_s *utest_thread_exit_data_init(thread_arg_s *arg, test_thread_type_e type) {
     int i;
     thread_data_s *exit_data = (thread_data_s *)malloc(sizeof(thread_data_s));
     if (exit_data == NULL) {
@@ -268,7 +268,7 @@ void *utest_producer_thread(void *arg) {
     }
 
     thread_arg_s *tmp_arg = (thread_arg_s *)arg;
-    thread_data_s *exit_data = utest_thread_exit_data_init(tmp_arg, THREAD_PRODUCER);
+    thread_data_s *exit_data = utest_thread_exit_data_init(tmp_arg, TEST_THREAD_PRODUCER);
     if (arg == NULL) {
         BBQ_ERR_LOG("thread_data init failed");
         exit(-1);
@@ -298,7 +298,7 @@ void *utest_consumer_thread(void *arg) {
     }
 
     thread_arg_s *tmp_arg = (thread_arg_s *)arg;
-    thread_data_s *exit_data = utest_thread_exit_data_init(tmp_arg, THREAD_CONSUMER);
+    thread_data_s *exit_data = utest_thread_exit_data_init(tmp_arg, TEST_THREAD_CONSUMER);
     if (arg == NULL) {
         BBQ_ERR_LOG("thread_data init failed");
         exit(-1);

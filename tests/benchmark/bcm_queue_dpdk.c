@@ -6,7 +6,6 @@
  */
 
 #include "bbq_errno.h"
-#include "bcm_common.h"
 #include "test_common.h"
 
 #include "bcm_queue.h"

@@ -1,24 +1,19 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-22 00:17:49
+ * @LastEditTime: 2024-05-24 16:42:58
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
 
 #ifndef _UNITTEST_H_
 #define _UNITTEST_H_
+#include "test_common.h"
 #include <stdint.h>
 
 typedef struct {
     uint64_t v1;
     uint64_t v2;
 } testdata_s;
-
-typedef enum {
-    THREAD_PRODUCER,
-    THREAD_CONSUMER,
-    THREAD_TYPE_MAX,
-} thread_type;
 
 typedef struct {
     bbq_queue_s *q;
@@ -29,13 +24,13 @@ typedef struct {
 
 typedef struct {
     pthread_t thread_id;
-    thread_type type;     // 线程类型
-    uint64_t exec_times;  // 执行次数
-    uint64_t succ_times;  // 成功次数
-    uint64_t full_times;  // 失败，队列满次数
-    uint64_t busy_times;  // 失败，队列忙次数
-    uint64_t empty_times; // 失败，队列空次数
-    testdata_s *data;     // 线程数据
-    thread_arg_s *arg;    // 创建线程时传入的参数
+    test_thread_type_e type; // 线程类型
+    uint64_t exec_times;     // 执行次数
+    uint64_t succ_times;     // 成功次数
+    uint64_t full_times;     // 失败，队列满次数
+    uint64_t busy_times;     // 失败，队列忙次数
+    uint64_t empty_times;    // 失败，队列空次数
+    testdata_s *data;        // 线程数据
+    thread_arg_s *arg;       // 创建线程时传入的参数
 } thread_data_s;
 #endif
