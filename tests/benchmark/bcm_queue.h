@@ -25,8 +25,8 @@ typedef struct {
     };
 } bcm_queue_t;
 
-extern int bcm_queue_init(bcm_cfg *cfg, bcm_queue_t *q);
-extern int bcm_queue_init_dpdk(bcm_cfg *cfg, bcm_queue_t *q);
-extern int bcm_queue_init_bbq(bcm_cfg *cfg, bcm_queue_t *q);
+extern int bcm_queue_init(test_cfg *cfg, bcm_queue_t *q);
+extern int bcm_queue_init_dpdk(test_cfg *cfg, bcm_queue_t *q);
+extern int bcm_queue_init_bbq(test_cfg *cfg, bcm_queue_t *q);
 
 #endif

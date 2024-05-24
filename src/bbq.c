@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-24 16:02:08
+ * @LastEditTime: 2024-05-24 18:34:20
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -79,6 +79,7 @@ static unsigned ceil_log2(uint64_t x) {
 
 bbq_queue_s *bbq_ring_create_bnbs(const char *name, size_t bn, size_t bs, int socket_id, bbq_policy_e policy) {
     int ret = 0;
+
     bbq_queue_s *q = bbq_malloc(BBQ_MODULE_QUEUE, sizeof(bbq_queue_s));
     if (q == NULL) {
         BBQ_ERR_LOG("malloc error");
@@ -86,13 +87,18 @@ bbq_queue_s *bbq_ring_create_bnbs(const char *name, size_t bn, size_t bs, int so
     }
     bbq_memset(q, sizeof(bbq_queue_s));
 
+    ret = snprintf(q->name, sizeof(q->name), "bbq_%s", name);
+    if (ret < 0 || ret >= (int)sizeof(q->name)) {
+        BBQ_ERR_LOG("bbq name too long");
+        goto error;
+    }
+
     q->phead = 0;
     q->chead = 0;
     q->policy = policy;
     q->blocks = bbq_malloc(BBQ_MODULE_QUEUE, bn * sizeof(bbq_block_s));
     if (q->blocks == NULL) {
-        BBQ_ERR_LOG("malloc error");
-        return NULL;
+        goto error;
     }
     q->bn = bn;
     q->bs = bs;
@@ -102,9 +108,7 @@ bbq_queue_s *bbq_ring_create_bnbs(const char *name, size_t bn, size_t bs, int so
         bool cursor_init_flag = (i == 0 ? false : true);
         ret = block_init(&(q->blocks[i]), bs, cursor_init_flag);
         if (ret != BBQ_OK) {
-            BBQ_ERR_LOG("block init error");
-            bbq_ring_free(q);
-            return NULL;
+            goto error;
         }
     }
 
@@ -115,6 +119,17 @@ bbq_queue_s *bbq_ring_create_bnbs(const char *name, size_t bn, size_t bs, int so
     q->off_mask = (1 << q->off_bits) - 1;
 
     return q;
+
+error:
+    if (q != NULL) {
+        if (q->blocks) {
+            for (size_t i = 0; i < bn; ++i) {
+                bbq_free(BBQ_MODULE_QUEUE, q->blocks->entries);
+            }
+            bbq_free(BBQ_MODULE_QUEUE, q->blocks);
+        }
+    }
+    return NULL;
 }
 
 bbq_queue_s *bbq_ring_create(const char *name, uint32_t count,

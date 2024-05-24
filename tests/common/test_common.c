@@ -4,7 +4,7 @@
 #include "iniparser.h"
 #include <string.h>
 
-int bxm_load_config(const char *config, bcm_cfg *cfg) {
+int bxm_load_config(const char *config, test_cfg *cfg) {
     // 加载配置
     dictionary *ini = iniparser_load(config);
     if (ini == NULL) {

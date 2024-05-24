@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-24 16:53:22
+ * @LastEditTime: 2024-05-24 18:08:38
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -11,12 +11,13 @@
 #include <pthread.h>
 #include <stdatomic.h>
 #include <stdlib.h>
+#include <sys/prctl.h>
 #include <unistd.h>
 
 typedef struct {
     test_thread_type_e ttype;
     int core;
-    bcm_cfg *cfg;
+    test_cfg *cfg;
     bcm_queue_t *q;
 } bcm_thread_arg_s;
 
@@ -84,56 +85,79 @@ void *bcm_thread_producer_start(void *arg) {
     bcm_thread_arg_s *t_arg = (bcm_thread_arg_s *)arg;
     bcm_exit_data *exit_data = bcm_exit_data_create(t_arg);
     uint32_t thread_cnt_max = t_arg->cfg->consumer_cnt + t_arg->cfg->producer_cnt;
+    char thread_name[128] = {0};
+    snprintf(thread_name, sizeof(thread_name), "producer:%x", exit_data->thread_id);
+    prctl(PR_SET_NAME, thread_name);
+
     bcm_wait_all_threads_ready(thread_cnt_max);
 
-    if (t_arg->cfg->workload == TEST_WORKLOAD_SIMPLE) {
-        t_arg->q->enqueue_f(t_arg->q->ring, &(exit_data->simple_data));
-    } else {
-        bcm_simple_data *data = bbq_malloc(BBQ_MODULE_BCM, sizeof(bcm_simple_data));
-        if (data == NULL) {
-            BBQ_ERR_LOG("malloc falied");
-            perror("malloc falied");
-        }
-        *data = BCM_SIMPLE_DATA_MAGIC;
-        ret = t_arg->q->enqueue_f(t_arg->q->ring, data);
-        if (ret == 0) {
-            exit_data->complex_data.data[exit_data->complex_data.data_cnt++] = *data;
-        } else {
-            bbq_free(BBQ_MODULE_BCM, data);
-        }
-        bcmbusy_loopof();
-    }
+    uint64_t en_ok_cnt = 0;
 
+    for (uint64_t i; i < t_arg->cfg->enqueue_cnt; i++) {
+        if (t_arg->cfg->workload == TEST_WORKLOAD_SIMPLE) {
+            ret = t_arg->q->enqueue_f(t_arg->q->ring, &(exit_data->simple_data));
+        } else {
+            bcm_simple_data *data = bbq_malloc(BBQ_MODULE_BCM, sizeof(bcm_simple_data));
+            if (data == NULL) {
+                BBQ_ERR_LOG("malloc falied");
+                perror("malloc falied");
+            }
+            *data = BCM_SIMPLE_DATA_MAGIC;
+            ret = t_arg->q->enqueue_f(t_arg->q->ring, data);
+            if (ret == 0) {
+                exit_data->complex_data.data[exit_data->complex_data.data_cnt++] = *data;
+            } else {
+                bbq_free(BBQ_MODULE_BCM, data);
+            }
+            bcmbusy_loopof();
+        }
+
+        if (ret == 0) {
+            en_ok_cnt++;
+        }
+    }
+    BBQ_INFO_LOG("producer-----> en_ok:%lu", en_ok_cnt);
     pthread_exit(exit_data);
 }
 
 void *bcm_thread_consumer_start(void *arg) {
     int ret = 0;
+    uint64_t de_ok_cnt = 0;
+
     bcm_thread_arg_s *t_arg = (bcm_thread_arg_s *)arg;
     bcm_exit_data *exit_data = bcm_exit_data_create(t_arg);
     uint32_t thread_cnt_max = t_arg->cfg->consumer_cnt + t_arg->cfg->producer_cnt;
+
+    char thread_name[128] = {0};
+    snprintf(thread_name, sizeof(thread_name), "consumer:%x", exit_data->thread_id);
+    prctl(PR_SET_NAME, thread_name);
+
     bcm_wait_all_threads_ready(thread_cnt_max);
 
-    bcm_simple_data *data = NULL;
-    ret = t_arg->q->dequeue_f(t_arg->q->ring, (void **)(&data));
-    if (ret == 0) {
-        if (*data != BCM_SIMPLE_DATA_MAGIC) {
-            BBQ_ERR_LOG("the obtained data is not consistent with the expectation, expect:%u actual:%u", BCM_SIMPLE_DATA_MAGIC, *data);
-            perror("the obtained data is not consistent with the expectation");
-        }
+    for (uint64_t i; i < t_arg->cfg->dequeue_cnt; i++) {
+        bcm_simple_data *data = NULL;
+        ret = t_arg->q->dequeue_f(t_arg->q->ring, (void **)(&data));
+        if (ret == 0) {
+            if (*data != BCM_SIMPLE_DATA_MAGIC) {
+                BBQ_ERR_LOG("the obtained data is not consistent with the expectation, expect:%u actual:%u", BCM_SIMPLE_DATA_MAGIC, *data);
+                perror("the obtained data is not consistent with the expectation");
+            }
 
-        if (t_arg->cfg->workload == TEST_WORKLOAD_COMPLEX) {
-            exit_data->complex_data.data[exit_data->complex_data.data_cnt++] = *data;
-            bbq_free(BBQ_MODULE_BCM, data);
-            bcmbusy_loopof();
+            if (t_arg->cfg->workload == TEST_WORKLOAD_COMPLEX) {
+                exit_data->complex_data.data[exit_data->complex_data.data_cnt++] = *data;
+                bbq_free(BBQ_MODULE_BCM, data);
+                bcmbusy_loopof();
+            }
+            de_ok_cnt++;
         }
     }
 
+    BBQ_INFO_LOG("consumer-----> de_ok:%lu", de_ok_cnt);
     pthread_exit(exit_data);
 }
 
 pthread_t *
-bcm_one_thread_creat(bcm_cfg *cfg, bcm_queue_t *q, test_thread_type_e ttype, int core, pthread_t *thread) {
+bcm_one_thread_creat(test_cfg *cfg, bcm_queue_t *q, test_thread_type_e ttype, int core, pthread_t *thread) {
     BBQ_INFO_LOG("thread type:%d core:%d", ttype, core);
 
     bcm_thread_arg_s *arg = (bcm_thread_arg_s *)bbq_malloc(BBQ_MODULE_BCM, sizeof(bcm_thread_arg_s)); // 线程回收时free
@@ -154,7 +178,7 @@ bcm_one_thread_creat(bcm_cfg *cfg, bcm_queue_t *q, test_thread_type_e ttype, int
         core_id = (core_id + 1) < max_id ? (core_id + 1) : core_id; \
     } while (0)
 
-pthread_t *bcm_threads_creat(bcm_cfg *cfg, bcm_queue_t *q) {
+pthread_t *bcm_threads_creat(test_cfg *cfg, bcm_queue_t *q) {
     // 创建生产者消费者线程
     int ret;
     size_t thread_id = 0;
@@ -229,8 +253,12 @@ int main(int argc, char *argv[]) {
         BBQ_ERR_LOG("!!!!!! not input config path, use default config:%s", config);
     }
 
+    char thread_name[128] = {0};
+    snprintf(thread_name, sizeof(thread_name), "main:%x", pthread_self());
+    prctl(PR_SET_NAME, thread_name);
+
     // 加载配置
-    bcm_cfg cfg;
+    test_cfg cfg;
     if (bxm_load_config(config, &cfg) != 0) {
         BBQ_ERR_LOG("input config path");
         return -1;

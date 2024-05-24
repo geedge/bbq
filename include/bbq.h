@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu@geedgenetworks.com
- * @LastEditTime: 2024-05-24 16:10:19
+ * @LastEditTime: 2024-05-24 18:21:18
  * @Describe:
  */
 
@@ -71,6 +71,7 @@ typedef enum {
     BBQ_RETRY_NEW // 入队时队列满了，则本次入队失败
 } bbq_policy_e;
 
+#define BBQ_NAME_MAXLEN 32
 typedef struct {
     bbq_head phead;
     bbq_head chead;
@@ -83,6 +84,8 @@ typedef struct {
     unsigned off_bits;
     unsigned idx_mask;
     unsigned off_mask;
+
+    char name[BBQ_NAME_MAXLEN];
 } bbq_queue_s;
 
 typedef enum {
