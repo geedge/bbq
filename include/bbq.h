@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu@geedgenetworks.com
- * @LastEditTime: 2024-05-23 18:00:54
+ * @LastEditTime: 2024-05-24 12:01:33
  * @Describe:
  */
 
@@ -9,7 +9,7 @@
 
 #define BBQ_DEBUG
 
-#include "bbq_error.h"
+#include "bbq_errno.h"
 #include "bbq_log.h"
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -66,15 +66,8 @@ typedef struct {
     };
 } QueueState_s;
 
-typedef enum {
-    OK = 0, // 入队或出队成功
-    FULL,   // 队列已满（入队失败）
-    BUSY,   // 队列忙碌中（入队或出队失败）
-    EMPTY,  // 队列已空（出队失败）
-} QueueStatus_e;
-
 typedef struct {
-    QueueStatus_e status;
+    int status;
     bbq_data data; // OKAY时生效，指向入队/出队的数据
 } QueueStatus_s;
 
@@ -102,7 +95,7 @@ extern BlockBoundedQueue_s *bbq_ring_create(const char *name, uint32_t count,
 
 extern BlockBoundedQueue_s *bbq_ring_create_bnbs(const char *name, size_t bn, size_t bs, int socket_id, Policy_e policy);
 extern void bbq_ring_free(BlockBoundedQueue_s *q);
-extern QueueStatus_e bbq_enqueue(BlockBoundedQueue_s *q, bbq_data data);
-extern QueueStatus_e bbq_dequeue(BlockBoundedQueue_s *q, bbq_data *deq_data);
+extern int bbq_enqueue(BlockBoundedQueue_s *q, bbq_data data);
+extern int bbq_dequeue(BlockBoundedQueue_s *q, bbq_data *deq_data);
 
 #endif

@@ -49,7 +49,7 @@
         "bbq.h": "c",
         "stdio.h": "c",
         "stdbool.h": "c",
-        "bbq_error.h": "c",
+        "bbq_errno.h": "c",
         "stddef.h": "c",
         "any": "cpp",
         "condition_variable": "cpp",

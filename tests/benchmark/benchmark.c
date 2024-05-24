@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-24 11:30:05
+ * @LastEditTime: 2024-05-24 11:43:41
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -42,6 +42,13 @@ typedef struct {
 
 // 记录已启动的线程
 atomic_uint thread_cnt_now = 0;
+
+void bcmbusy_loopof() {
+    uint32_t loop = 0;
+    while (loop <= 50) {
+        loop++;
+    };
+}
 
 void bcm_wait_all_threads_ready(uint32_t thread_cnt_max) {
     atomic_fetch_add(&thread_cnt_now, 1);
@@ -96,6 +103,7 @@ void *thread_producer_start(void *arg) {
         } else {
             free(data);
         }
+        bcmbusy_loopof();
     }
 
     pthread_exit(exit_data);
@@ -119,6 +127,7 @@ void *thread_consumer_start(void *arg) {
         if (t_arg->cfg->workload == BCM_WORKLOAD_COMPLEX) {
             exit_data->complex_data.data[exit_data->complex_data.data_cnt++] = *data;
             free(data);
+            bcmbusy_loopof();
         }
     }
 

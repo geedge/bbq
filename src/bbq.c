@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-23 18:03:36
+ * @LastEditTime: 2024-05-24 12:02:03
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -138,7 +138,7 @@ void bbq_ring_free(BlockBoundedQueue_s *q) {
     bbq_free(q);
 }
 
-QueueStatus_e bbq_enqueue(BlockBoundedQueue_s *q, bbq_data data) {
+int bbq_enqueue(BlockBoundedQueue_s *q, bbq_data data) {
     while (true) {
         // 获取当前phead，转为索引后获取到当前的blk
         uint64_t ph = atomic_load(&q->phead);
@@ -150,14 +150,14 @@ QueueStatus_e bbq_enqueue(BlockBoundedQueue_s *q, bbq_data data) {
         switch (state.state) {
         case ALLOCATED:
             commit_entry(&state.e, data);
-            return OK;
+            return BBQ_OK;
         case BLOCK_DONE:
             ps = advance_phead(q, ph);
             switch (ps.state) {
             case NO_ENTRY:
-                return FULL;
+                return BBQ_QUEUE_FULL;
             case NOT_AVAILABLE:
-                return BUSY;
+                return BBQ_QUEUE_BUSY;
             case SUCCESS:
                 continue;
             }
@@ -169,7 +169,7 @@ QueueStatus_e bbq_enqueue(BlockBoundedQueue_s *q, bbq_data data) {
 }
 
 // TODO:入参检查，出队失败，数据设置NULL？
-QueueStatus_e bbq_dequeue(BlockBoundedQueue_s *q, bbq_data *deq_data) {
+int bbq_dequeue(BlockBoundedQueue_s *q, bbq_data *deq_data) {
     while (true) {
         uint64_t ch = atomic_load(&q->chead);
         Block_s *blk = &(q->blocks[idx(q, ch)]);
@@ -183,19 +183,19 @@ QueueStatus_e bbq_dequeue(BlockBoundedQueue_s *q, bbq_data *deq_data) {
             data = consume_entry(q, &state.e);
             if (data) {
                 *deq_data = data;
-                return OK;
+                return BBQ_OK;
             } else {
                 continue;
             }
         case NO_ENTRY:
-            return EMPTY;
+            return BBQ_QUEUE_EMPTY;
         case NOT_AVAILABLE:
-            return BUSY;
+            return BBQ_QUEUE_BUSY;
         case BLOCK_DONE:
             if (advance_chead(q, ch, state.vsn)) {
                 continue;
             } else {
-                return EMPTY;
+                return BBQ_QUEUE_EMPTY;
             }
         default:
             BBQ_ERR_LOG("Invalid QueueState in dequeue state: %d", state.state);

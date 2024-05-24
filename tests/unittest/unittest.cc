@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-23 18:01:56
+ * @LastEditTime: 2024-05-24 12:01:42
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -47,24 +47,24 @@ TEST(boundary, full_empty) {
     testdata_s *data = (testdata_s *)malloc(sizeof(testdata_s) * cnt);
 
     // 2.入满队列，成功
-    QueueStatus_e en_status;
+    int en_status;
     for (int i = 0; i < cnt; i++) {
         data[i].v1 = i;
         data[i].v2 = i;
         en_status = bbq_enqueue(q, &data[i]);
-        EXPECT_TRUE(en_status == OK) << "FAILED-2 when enqueue,  i:" << i << " en_status:%d " << en_status;
+        EXPECT_TRUE(en_status == BBQ_OK) << "FAILED-2 when enqueue,  i:" << i << " en_status:%d " << en_status;
     }
 
     // 3.再入队（满），失败
     en_status = bbq_enqueue(q, &data[0]);
-    EXPECT_TRUE(en_status == FULL) << "FAILED-3";
+    EXPECT_TRUE(en_status == BBQ_QUEUE_FULL) << "FAILED-3";
 
-    QueueStatus_e de_status;
+    int de_status;
     // 4.出满队列，成功
     for (int i = 0; i < cnt; i++) {
         bbq_data de_data = NULL;
         de_status = bbq_dequeue(q, &de_data);
-        EXPECT_TRUE(de_status == OK) << "FAILED-4 when dequeue,  i:" << i << " en_status:%d " << en_status;
+        EXPECT_TRUE(de_status == BBQ_OK) << "FAILED-4 when dequeue,  i:" << i << " en_status:%d " << en_status;
         EXPECT_EQ(i, ((testdata_s *)de_data)->v1) << "FAILED 5";
         EXPECT_EQ(i, ((testdata_s *)de_data)->v2) << "FAILED 6";
     }
@@ -72,7 +72,7 @@ TEST(boundary, full_empty) {
     // 5.再出队（空），失败
     bbq_data de_data = NULL;
     de_status = bbq_dequeue(q, &de_data);
-    EXPECT_TRUE(de_status == EMPTY) << "FAILED 7";
+    EXPECT_TRUE(de_status == BBQ_QUEUE_EMPTY) << "FAILED 7";
 
     bbq_ring_free(q);
 
@@ -240,19 +240,19 @@ void utest_thread_exit_merge_counter(thread_data_s *data_arr, thread_data_s *dat
     data_arr[data->type].empty_times += data->empty_times;
 }
 
-void utest_thread_exit_data_counter(thread_data_s *exit_data, QueueStatus_e status) {
+void utest_thread_exit_data_counter(thread_data_s *exit_data, int status) {
     exit_data->exec_times++;
     switch (status) {
-    case OK:
+    case BBQ_OK:
         exit_data->succ_times++;
         break;
-    case BUSY:
+    case BBQ_QUEUE_BUSY:
         exit_data->busy_times++;
         break;
-    case EMPTY:
+    case BBQ_QUEUE_EMPTY:
         exit_data->empty_times++;
         break;
-    case FULL:
+    case BBQ_QUEUE_FULL:
         exit_data->full_times++;
         break;
     default:
@@ -275,7 +275,7 @@ void *utest_producer_thread(void *arg) {
     }
 
     size_t i = 0;
-    QueueStatus_e en_status = OK;
+    int en_status = BBQ_OK;
 
     for (size_t i = 0; i < tmp_arg->thread_exec_times; i++) {
         testdata_s *enqueue_data = &exit_data->data[exit_data->succ_times];
@@ -305,10 +305,10 @@ void *utest_consumer_thread(void *arg) {
     }
 
     size_t i = 0;
-    QueueStatus_e status = OK;
+    int status = BBQ_OK;
     while (true) {
         // 如果==0，则直到队列空了才退出
-        if (tmp_arg->until_end == true && status == EMPTY) {
+        if (tmp_arg->until_end == true && status == BBQ_QUEUE_EMPTY) {
             break;
         }
 
@@ -318,7 +318,7 @@ void *utest_consumer_thread(void *arg) {
 
         bbq_data deq_data = NULL;
         status = bbq_dequeue(tmp_arg->q, &deq_data);
-        if (status == OK) {
+        if (status == BBQ_OK) {
             exit_data->data[exit_data->succ_times] = (*(testdata_s *)deq_data);
         }
         utest_thread_exit_data_counter(exit_data, status);
