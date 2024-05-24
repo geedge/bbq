@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu@geedgenetworks.com
- * @LastEditTime: 2024-05-24 13:59:28
+ * @LastEditTime: 2024-05-24 15:03:33
  * @Describe:
  */
 
@@ -13,6 +13,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+
+#define BBQ_MEMORY
 
 #ifndef __cplusplus
 // C
@@ -82,6 +84,13 @@ typedef struct {
     unsigned idx_mask;
     unsigned off_mask;
 } bbq_queue_s;
+
+typedef enum {
+    BBQ_MODULE_QUEUE,
+    BBQ_MODULE_UTEST,
+    BBQ_MODULE_BCM,
+    BBQ_MODULE_MAX,
+} bbq_module_e; // 用于内存测试
 
 extern bbq_queue_s *bbq_ring_create(const char *name, uint32_t count,
                                     int socket_id, bbq_policy_e policy);

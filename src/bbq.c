@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-24 14:06:21
+ * @LastEditTime: 2024-05-24 15:03:40
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -21,9 +21,9 @@ static inline uint64_t head_vsn(bbq_queue_s *q, uint64_t x);
 static inline uint64_t cur_vsn(bbq_queue_s *q, uint64_t x);
 static inline uint64_t set_cur_vsn(bbq_queue_s *q, uint64_t ver);
 static inline uint64_t fetch_max(aotmic_uint64 *atom, uint64_t upd);
-static inline void *bbq_malloc(size_t size);
+static inline void *bbq_malloc(bbq_module_e module, size_t size);
+static inline void bbq_free(bbq_module_e module, void *ptr);
 static inline void *bbq_memset(void *data, size_t size);
-static inline void bbq_free(void *ptr);
 
 // 根据entries大小返回合理的blocks配置TODO:
 static uint32_t bbq_blocks_calc(uint32_t entries) {
@@ -35,7 +35,7 @@ static uint32_t bbq_blocks_calc(uint32_t entries) {
 }
 
 static int block_init(bbq_block_s *block, size_t bs, bool cursor_init) {
-    block->entries = bbq_malloc(sizeof(bbq_data) * bs);
+    block->entries = bbq_malloc(BBQ_MODULE_QUEUE, sizeof(bbq_data) * bs);
     if (block->entries == NULL) {
         BBQ_ERR_LOG("bbq_malloc error");
         return BBQ_ALLOC_ERR;
@@ -57,7 +57,7 @@ static int block_init(bbq_block_s *block, size_t bs, bool cursor_init) {
 }
 
 static void block_cleanup(bbq_block_s *block, size_t bs) {
-    bbq_free(block->entries);
+    bbq_free(BBQ_MODULE_QUEUE, block->entries);
     block->entries = NULL;
 }
 
@@ -79,7 +79,7 @@ static unsigned ceil_log2(uint64_t x) {
 
 bbq_queue_s *bbq_ring_create_bnbs(const char *name, size_t bn, size_t bs, int socket_id, bbq_policy_e policy) {
     int ret = 0;
-    bbq_queue_s *q = bbq_malloc(sizeof(bbq_queue_s));
+    bbq_queue_s *q = bbq_malloc(BBQ_MODULE_QUEUE, sizeof(bbq_queue_s));
     if (q == NULL) {
         BBQ_ERR_LOG("malloc error");
         return NULL;
@@ -89,7 +89,7 @@ bbq_queue_s *bbq_ring_create_bnbs(const char *name, size_t bn, size_t bs, int so
     q->phead = 0;
     q->chead = 0;
     q->policy = policy;
-    q->blocks = bbq_malloc(bn * sizeof(bbq_block_s));
+    q->blocks = bbq_malloc(BBQ_MODULE_QUEUE, bn * sizeof(bbq_block_s));
     if (q->blocks == NULL) {
         BBQ_ERR_LOG("malloc error");
         return NULL;
@@ -134,8 +134,8 @@ void bbq_ring_free(bbq_queue_s *q) {
         block_cleanup(&(q->blocks[i]), q->bs);
     }
 
-    bbq_free(q->blocks);
-    bbq_free(q);
+    bbq_free(BBQ_MODULE_QUEUE, q->blocks);
+    bbq_free(BBQ_MODULE_QUEUE, q);
 }
 
 int bbq_enqueue(bbq_queue_s *q, bbq_data data) {
@@ -417,7 +417,7 @@ static aotmic_uint64 malloc_cnt = 0;
 static aotmic_uint64 free_cnt = 0;
 #endif
 
-static inline void *bbq_malloc(size_t size) {
+static inline void *bbq_malloc(bbq_module_e module, size_t size) {
     void *ptr = malloc(size);
 
 #ifdef BBQ_MEMORY
@@ -428,19 +428,19 @@ static inline void *bbq_malloc(size_t size) {
     return ptr;
 }
 
-static inline void *bbq_memset(void *data, size_t size) {
-    if (data != NULL && size > 0) {
-        memset(data, 0, size);
-    }
-}
-
-static inline void bbq_free(void *ptr) {
+static inline void bbq_free(bbq_module_e module, void *ptr) {
 #ifdef BBQ_MEMORY
     if (ptr != NULL) {
         atomic_fetch_add(&free_cnt, 1);
     }
 #endif
     free(ptr);
+}
+
+static inline void *bbq_memset(void *data, size_t size) {
+    if (data != NULL && size > 0) {
+        memset(data, 0, size);
+    }
 }
 
 void bbq_memory_info() {
