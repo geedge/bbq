@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-24 15:03:40
+ * @LastEditTime: 2024-05-24 16:02:08
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -21,9 +21,9 @@ static inline uint64_t head_vsn(bbq_queue_s *q, uint64_t x);
 static inline uint64_t cur_vsn(bbq_queue_s *q, uint64_t x);
 static inline uint64_t set_cur_vsn(bbq_queue_s *q, uint64_t ver);
 static inline uint64_t fetch_max(aotmic_uint64 *atom, uint64_t upd);
-static inline void *bbq_malloc(bbq_module_e module, size_t size);
-static inline void bbq_free(bbq_module_e module, void *ptr);
-static inline void *bbq_memset(void *data, size_t size);
+static void *bbq_memset(void *data, size_t size);
+extern void *bbq_malloc(bbq_module_e module, size_t size);
+extern void bbq_free(bbq_module_e module, void *ptr);
 
 // 根据entries大小返回合理的blocks配置TODO:
 static uint32_t bbq_blocks_calc(uint32_t entries) {
@@ -413,31 +413,33 @@ static inline uint64_t fetch_max(aotmic_uint64 *atom, uint64_t upd) {
 }
 
 #ifdef BBQ_MEMORY
-static aotmic_uint64 malloc_cnt = 0;
-static aotmic_uint64 free_cnt = 0;
+typedef struct {
+    aotmic_uint64 malloc_cnt;
+    aotmic_uint64 free_cnt;
+} bbq_memory_s;
+bbq_memory_s bbq_memory_g[BBQ_MODULE_MAX] = {0};
 #endif
 
-static inline void *bbq_malloc(bbq_module_e module, size_t size) {
+void *bbq_malloc(bbq_module_e module, size_t size) {
     void *ptr = malloc(size);
-
 #ifdef BBQ_MEMORY
     if (ptr != NULL) {
-        atomic_fetch_add(&malloc_cnt, 1);
+        atomic_fetch_add(&bbq_memory_g[module].malloc_cnt, 1);
     }
 #endif
     return ptr;
 }
 
-static inline void bbq_free(bbq_module_e module, void *ptr) {
+void bbq_free(bbq_module_e module, void *ptr) {
 #ifdef BBQ_MEMORY
     if (ptr != NULL) {
-        atomic_fetch_add(&free_cnt, 1);
+        atomic_fetch_add(&bbq_memory_g[module].free_cnt, 1);
     }
 #endif
     free(ptr);
 }
 
-static inline void *bbq_memset(void *data, size_t size) {
+static void *bbq_memset(void *data, size_t size) {
     if (data != NULL && size > 0) {
         memset(data, 0, size);
     }
@@ -445,8 +447,17 @@ static inline void *bbq_memset(void *data, size_t size) {
 
 void bbq_memory_info() {
 #ifdef BBQ_MEMORY
-    BBQ_INFO_LOG("malloc cnt:%lu", atomic_load(&malloc_cnt));
-    BBQ_INFO_LOG("free cnt:%lu", atomic_load(&free_cnt));
+    for (int i = 0; i < BBQ_MODULE_MAX; i++) {
+        uint64_t malloc_cnt = atomic_load(&bbq_memory_g[i].malloc_cnt);
+        uint64_t free_cnt = atomic_load(&bbq_memory_g[i].free_cnt);
+        if (malloc_cnt == 0 && free_cnt == 0) {
+            continue;
+        }
+
+        BBQ_INFO_LOG("[%d] malloc:%lu free:%lu", i,
+                     atomic_load(&bbq_memory_g[i].malloc_cnt),
+                     atomic_load(&bbq_memory_g[i].free_cnt));
+    }
 #else
     BBQ_INFO_LOG("BBQ_MEMORY is not define");
 #endif
@@ -454,7 +465,16 @@ void bbq_memory_info() {
 
 bool bbq_malloc_free_equal() {
 #ifdef BBQ_MEMORY
-    return atomic_load(&malloc_cnt) == atomic_load(&free_cnt);
+    bool ret = true;
+    for (int i = 0; i < BBQ_MODULE_MAX; i++) {
+        uint64_t malloc_cnt = atomic_load(&bbq_memory_g[i].malloc_cnt);
+        uint64_t free_cnt = atomic_load(&bbq_memory_g[i].free_cnt);
+        if (malloc_cnt != free_cnt) {
+            BBQ_ERR_LOG("[%d] malloc:%lu free:%lu, not equal\n", i, malloc_cnt, free_cnt);
+            ret = false;
+        }
+    }
+    return ret;
 #else
     BBQ_INFO_LOG("BBQ_MEMORY is not define");
     return true;

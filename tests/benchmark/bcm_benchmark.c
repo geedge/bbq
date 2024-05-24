@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-24 14:15:36
+ * @LastEditTime: 2024-05-24 16:10:32
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -43,6 +43,11 @@ typedef struct {
 // 记录已启动的线程
 atomic_uint bcm_thread_now = 0;
 
+extern void *bbq_malloc(bbq_module_e module, size_t size);
+extern void bbq_free(bbq_module_e module, void *ptr);
+extern void bbq_memory_info();
+extern bool bbq_malloc_free_equal();
+
 void bcmbusy_loopof() {
     uint32_t loop = 0;
     while (loop <= 50) {
@@ -58,7 +63,7 @@ void bcm_wait_all_threads_ready(uint32_t thread_cnt_max) {
 }
 
 bcm_exit_data *bcm_exit_data_create(bcm_thread_arg_s *t_arg) {
-    bcm_exit_data *exit_data = (bcm_exit_data *)malloc(sizeof(bcm_exit_data));
+    bcm_exit_data *exit_data = (bcm_exit_data *)bbq_malloc(BBQ_MODULE_BCM, sizeof(bcm_exit_data));
     if (exit_data == NULL) {
         BBQ_ERR_LOG("malloc failed");
         perror("malloc failed");
@@ -67,18 +72,16 @@ bcm_exit_data *bcm_exit_data_create(bcm_thread_arg_s *t_arg) {
     exit_data->arg = t_arg;
     exit_data->thread_id = pthread_self();
     exit_data->simple_data = BCM_SIMPLE_DATA_MAGIC;
-    exit_data->complex_data.data = malloc(t_arg->cfg->enqueue_cnt * sizeof(bcm_simple_data));
+    exit_data->complex_data.data = bbq_malloc(BBQ_MODULE_BCM, t_arg->cfg->enqueue_cnt * sizeof(bcm_simple_data));
     exit_data->complex_data.data_cnt = 0;
 
     return exit_data;
 }
 
 bcm_exit_data *bcm_exit_data_destory(bcm_exit_data *data) {
-    if (data->arg->ttype == BCM_CONSUMER && data->complex_data.data != NULL) {
-        free(data->complex_data.data);
-    }
-    free(data->arg);
-    free(data);
+    bbq_free(BBQ_MODULE_BCM, data->complex_data.data);
+    bbq_free(BBQ_MODULE_BCM, data->arg);
+    bbq_free(BBQ_MODULE_BCM, data);
 }
 
 void *bcm_thread_producer_start(void *arg) {
@@ -91,7 +94,7 @@ void *bcm_thread_producer_start(void *arg) {
     if (t_arg->cfg->workload == BCM_WORKLOAD_SIMPLE) {
         t_arg->q->enqueue_f(t_arg->q->ring, &(exit_data->simple_data));
     } else {
-        bcm_simple_data *data = malloc(sizeof(bcm_simple_data));
+        bcm_simple_data *data = bbq_malloc(BBQ_MODULE_BCM, sizeof(bcm_simple_data));
         if (data == NULL) {
             BBQ_ERR_LOG("malloc falied");
             perror("malloc falied");
@@ -101,7 +104,7 @@ void *bcm_thread_producer_start(void *arg) {
         if (ret == 0) {
             exit_data->complex_data.data[exit_data->complex_data.data_cnt++] = *data;
         } else {
-            free(data);
+            bbq_free(BBQ_MODULE_BCM, data);
         }
         bcmbusy_loopof();
     }
@@ -126,7 +129,7 @@ void *bcm_thread_consumer_start(void *arg) {
 
         if (t_arg->cfg->workload == BCM_WORKLOAD_COMPLEX) {
             exit_data->complex_data.data[exit_data->complex_data.data_cnt++] = *data;
-            free(data);
+            bbq_free(BBQ_MODULE_BCM, data);
             bcmbusy_loopof();
         }
     }
@@ -138,7 +141,7 @@ pthread_t *
 bcm_one_thread_creat(bcm_cfg *cfg, bcm_queue_t *q, bcm_threadtype_e ttype, int core, pthread_t *thread) {
     BBQ_INFO_LOG("thread type:%d core:%d", ttype, core);
 
-    bcm_thread_arg_s *arg = (bcm_thread_arg_s *)malloc(sizeof(bcm_thread_arg_s)); // 线程回收时free
+    bcm_thread_arg_s *arg = (bcm_thread_arg_s *)bbq_malloc(BBQ_MODULE_BCM, sizeof(bcm_thread_arg_s)); // 线程回收时free
     arg->cfg = cfg;
     arg->q = q;
     arg->ttype = ttype;
@@ -162,7 +165,7 @@ pthread_t *bcm_threads_creat(bcm_cfg *cfg, bcm_queue_t *q) {
     size_t thread_id = 0;
     int core_id = 0;
     size_t thread_cnt = cfg->producer_cnt + cfg->consumer_cnt;
-    pthread_t *threads = (pthread_t *)malloc(sizeof(pthread_t) * thread_cnt); // 存储所有线程ID的数组
+    pthread_t *threads = (pthread_t *)bbq_malloc(BBQ_MODULE_BCM, sizeof(pthread_t) * thread_cnt); // 存储所有线程ID的数组
 
     // MPSC 或 SPMC 场景在第一个核心/超线程上分配单个生产者或消费者，然后将其他线程按顺序分配给核心/超线程。
     // MPMC，我们将生产者和消费者一一交错分配
@@ -211,6 +214,10 @@ pthread_t *bcm_threads_creat(bcm_cfg *cfg, bcm_queue_t *q) {
     return threads;
 }
 
+void bcm_threads_destory(pthread_t *threads) {
+    bbq_free(BBQ_MODULE_BCM, threads);
+}
+
 void bcm_report_generate(bcm_exit_data **exit_data, uint32_t thread_cnt) {
     // bcm_report report;
     for (uint32_t i = 0; i < thread_cnt; i++) {
@@ -244,8 +251,7 @@ int main(int argc, char *argv[]) {
     }
 
     // 创建线程
-    pthread_t *threads;
-    threads = bcm_threads_creat(&cfg, &q);
+    pthread_t *threads = bcm_threads_creat(&cfg, &q);
     if (threads == NULL) {
         BBQ_ERR_LOG("pthread_arr is NULL");
         return ret;
@@ -253,21 +259,28 @@ int main(int argc, char *argv[]) {
 
     // 等待所有线程完成，回收数据
     uint32_t thread_cnt = cfg.producer_cnt + cfg.consumer_cnt;
-    bcm_exit_data **exit_data = (bcm_exit_data **)malloc(sizeof(bcm_exit_data **) * (thread_cnt));
+    bcm_exit_data **exit_data = (bcm_exit_data **)bbq_malloc(BBQ_MODULE_BCM, sizeof(bcm_exit_data **) * (thread_cnt));
     uint32_t i = 0;
     for (i = 0; i < thread_cnt; i++) {
         pthread_join(threads[i], (void **)(&exit_data[i])); // 等待每个线程结束
     }
 
+    // 生成benchmark报告
     bcm_report_generate(exit_data, thread_cnt);
 
     // 回收、释放数据
     for (i = 0; i < thread_cnt; i++) {
         bcm_exit_data_destory(exit_data[i]);
     }
+    bbq_free(BBQ_MODULE_BCM, exit_data);
+    bcm_threads_destory(threads);
 
-    // 输出测试报告
-    BBQ_INFO_LOG("report\n");
+    bbq_memory_info();
 
+    if (bbq_malloc_free_equal()) {
+        BBQ_INFO_LOG("all memory free");
+    } else {
+        BBQ_ERR_LOG("memory not all free");
+    }
     return 0;
 }

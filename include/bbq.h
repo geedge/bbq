@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu@geedgenetworks.com
- * @LastEditTime: 2024-05-24 15:03:33
+ * @LastEditTime: 2024-05-24 16:10:19
  * @Describe:
  */
 
@@ -86,9 +86,10 @@ typedef struct {
 } bbq_queue_s;
 
 typedef enum {
-    BBQ_MODULE_QUEUE,
+    BBQ_MODULE_QUEUE = 0,
     BBQ_MODULE_UTEST,
     BBQ_MODULE_BCM,
+
     BBQ_MODULE_MAX,
 } bbq_module_e; // 用于内存测试
 
@@ -99,5 +100,4 @@ extern bbq_queue_s *bbq_ring_create_bnbs(const char *name, size_t bn, size_t bs,
 extern void bbq_ring_free(bbq_queue_s *q);
 extern int bbq_enqueue(bbq_queue_s *q, bbq_data data);
 extern int bbq_dequeue(bbq_queue_s *q, bbq_data *deq_data);
-
 #endif
