@@ -21,7 +21,7 @@ typedef enum {
 } thread_type;
 
 typedef struct {
-    BlockBoundedQueue_s *q;
+    bbq_queue_s *q;
     uint32_t usleep;            // 该线程每次执行间隔睡眠时间
     bool until_end;             // 循环读取，直到队列空或满
     uint64_t thread_exec_times; // 每个线程生产/消费次数

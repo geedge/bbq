@@ -19,13 +19,13 @@ extern void bbq_memory_info();
 namespace {
 extern void *utest_producer_thread(void *arg);
 extern void *utest_consumer_thread(void *arg);
-extern pthread_t *utest_threads_create(BlockBoundedQueue_s *q, size_t exec_times, size_t pthread_cnt,
+extern pthread_t *utest_threads_create(bbq_queue_s *q, size_t exec_times, size_t pthread_cnt,
                                        uint32_t pthread_usleep, size_t cthread_cnt,
                                        uint32_t cthread_usleep);
 extern void utest_thread_exit_data_destory(thread_data_s *data);
 extern void *utest_consumer_thread(void *arg);
 extern void utest_thread_create(pthread_t *threads, void *(*__start_routine)(void *),
-                                BlockBoundedQueue_s *q, uint32_t thread_usleep,
+                                bbq_queue_s *q, uint32_t thread_usleep,
                                 bool until_end, uint64_t thread_exec_times);
 extern void utest_threads_destory(pthread_t *threads);
 extern bool utest_thread_exit_merge_data_compare(thread_data_s *merge_pdata, thread_data_s *deque_datas);
@@ -38,9 +38,9 @@ size_t cthread_cnt = 10; // 消费者线程个数
 // 空队满队的边界测试
 TEST(boundary, full_empty) {
     int ret = 0;
-    BlockBoundedQueue_s *q;
+    bbq_queue_s *q;
     // 1.初始队列为空，入队失败
-    q = bbq_ring_create_bnbs("bbq_ring", bn, bs, 0, RETRY_NEW);
+    q = bbq_ring_create_bnbs("bbq_ring", bn, bs, 0, BBQ_RETRY_NEW);
     EXPECT_TRUE(q != NULL) << "FAILED-1";
 
     int cnt = bn * bs;
@@ -89,7 +89,7 @@ TEST(multi_pc, pquick) {
     uint64_t thread_exec_times = bs * 10;
     pthread_t *threads = NULL; // 存储所有线程ID的数组
 
-    BlockBoundedQueue_s *q = bbq_ring_create_bnbs("bbq_ring", bn, bs, 0, RETRY_NEW);
+    bbq_queue_s *q = bbq_ring_create_bnbs("bbq_ring", bn, bs, 0, BBQ_RETRY_NEW);
     EXPECT_TRUE(q != NULL) << "FAILED-1";
 
     // 创建生产者消费者线程
@@ -332,7 +332,7 @@ void *utest_consumer_thread(void *arg) {
 }
 
 void utest_thread_create(pthread_t *threads, void *(*thread_func)(void *),
-                         BlockBoundedQueue_s *q, uint32_t thread_usleep,
+                         bbq_queue_s *q, uint32_t thread_usleep,
                          bool until_end, uint64_t thread_exec_times) {
     thread_arg_s *arg = (thread_arg_s *)malloc(sizeof(thread_arg_s)); // 线程回收时free
     arg->q = q;
@@ -342,7 +342,7 @@ void utest_thread_create(pthread_t *threads, void *(*thread_func)(void *),
     pthread_create(threads, NULL, thread_func, arg);
 }
 
-pthread_t *utest_threads_create(BlockBoundedQueue_s *q, uint64_t thread_exec_times,
+pthread_t *utest_threads_create(bbq_queue_s *q, uint64_t thread_exec_times,
                                 size_t pthread_cnt, uint32_t pthread_usleep,
                                 size_t cthread_cnt, uint32_t cthread_usleep) {
     int ret;
