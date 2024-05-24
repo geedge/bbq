@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-23 11:52:54
+ * @LastEditTime: 2024-05-24 10:14:57
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -43,7 +43,7 @@ typedef struct {
     double *fairness;          // 公平性：每个生产者/消费者的吞吐量（占总吞吐的百分比）
     double full_empty;         // 队列满时入队的延迟/队列空时出队的延迟（仅用于简单工作负载）。
     uint64_t oversubscription; // 比核心/超线程更多的生产者和消费者的吞吐量
-} report;
+} bcm_report;
 
 typedef struct {
     struct timespec st; // 系统时间戳

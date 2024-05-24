@@ -1,16 +1,17 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-23 22:28:57
+ * @LastEditTime: 2024-05-24 11:30:05
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
-#include <pthread.h>
-#include <stdlib.h>
-#include <unistd.h>
 #include "bbq.h"
 #include "bcm_queue.h"
 #include "common.h"
 #include "iniparser.h"
+#include <pthread.h>
+#include <stdatomic.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 typedef enum {
     BCM_PRODUCER,
@@ -20,31 +21,115 @@ typedef enum {
 typedef struct {
     bcm_threadtype_e ttype;
     int core;
-    bcm_cfg* cfg;
-    bcm_queue_t* q;
+    bcm_cfg *cfg;
+    bcm_queue_t *q;
 } bcm_thread_arg_s;
 
+typedef uint8_t bcm_simple_data;
+
 typedef struct {
-    bcm_thread_arg_s* arg;
+    bcm_simple_data *data;
+    uint64_t data_cnt;
+} bcm_complex_data;
+
+#define BCM_SIMPLE_DATA_MAGIC 234
+typedef struct {
+    pthread_t thread_id;
+    bcm_thread_arg_s *arg;
+    bcm_simple_data simple_data;
+    bcm_complex_data complex_data;
 } bcm_exit_data;
 
-void* thread_producer_start(void*) {
-    bcm_exit_data* exit_data = (bcm_exit_data*)malloc(sizeof(bcm_exit_data));
-    printf("111\n");
+// 记录已启动的线程
+atomic_uint thread_cnt_now = 0;
+
+void bcm_wait_all_threads_ready(uint32_t thread_cnt_max) {
+    atomic_fetch_add(&thread_cnt_now, 1);
+    while (atomic_load(&thread_cnt_now) != thread_cnt_max) {
+        // 忙等待其他线程准备好
+    }
+}
+
+bcm_exit_data *exit_data_create(bcm_thread_arg_s *t_arg) {
+    bcm_exit_data *exit_data = (bcm_exit_data *)malloc(sizeof(bcm_exit_data));
+    if (exit_data == NULL) {
+        BBQ_ERR_LOG("malloc failed");
+        perror("malloc failed");
+    }
+
+    exit_data->arg = t_arg;
+    exit_data->thread_id = pthread_self();
+    exit_data->simple_data = BCM_SIMPLE_DATA_MAGIC;
+    exit_data->complex_data.data = malloc(t_arg->cfg->enqueue_cnt * sizeof(bcm_simple_data));
+    exit_data->complex_data.data_cnt = 0;
+
+    return exit_data;
+}
+
+bcm_exit_data *exit_data_destory(bcm_exit_data *data) {
+    if (data->arg->ttype == BCM_CONSUMER && data->complex_data.data != NULL) {
+        free(data->complex_data.data);
+    }
+    free(data->arg);
+    free(data);
+}
+
+void *thread_producer_start(void *arg) {
+    int ret = 0;
+    bcm_thread_arg_s *t_arg = (bcm_thread_arg_s *)arg;
+    bcm_exit_data *exit_data = exit_data_create(t_arg);
+    uint32_t thread_cnt_max = t_arg->cfg->consumer_cnt + t_arg->cfg->producer_cnt;
+    bcm_wait_all_threads_ready(thread_cnt_max);
+
+    if (t_arg->cfg->workload == BCM_WORKLOAD_SIMPLE) {
+        t_arg->q->enqueue_f(t_arg->q->ring, &(exit_data->simple_data));
+    } else {
+        bcm_simple_data *data = malloc(sizeof(bcm_simple_data));
+        if (data == NULL) {
+            BBQ_ERR_LOG("malloc falied");
+            perror("malloc falied");
+        }
+        *data = BCM_SIMPLE_DATA_MAGIC;
+        ret = t_arg->q->enqueue_f(t_arg->q->ring, data);
+        if (ret == 0) {
+            exit_data->complex_data.data[exit_data->complex_data.data_cnt++] = *data;
+        } else {
+            free(data);
+        }
+    }
+
     pthread_exit(exit_data);
 }
 
-void* thread_consumer_start(void*) {
-    bcm_exit_data* exit_data = (bcm_exit_data*)malloc(sizeof(bcm_exit_data));
-    printf("222\n");
+void *thread_consumer_start(void *arg) {
+    int ret = 0;
+    bcm_thread_arg_s *t_arg = (bcm_thread_arg_s *)arg;
+    bcm_exit_data *exit_data = exit_data_create(t_arg);
+    uint32_t thread_cnt_max = t_arg->cfg->consumer_cnt + t_arg->cfg->producer_cnt;
+    bcm_wait_all_threads_ready(thread_cnt_max);
+
+    bcm_simple_data *data = NULL;
+    ret = t_arg->q->dequeue_f(t_arg->q->ring, (void **)(&data));
+    if (ret == 0) {
+        if (*data != BCM_SIMPLE_DATA_MAGIC) {
+            BBQ_ERR_LOG("the obtained data is not consistent with the expectation, expect:%u actual:%u", BCM_SIMPLE_DATA_MAGIC, *data);
+            perror("the obtained data is not consistent with the expectation");
+        }
+
+        if (t_arg->cfg->workload == BCM_WORKLOAD_COMPLEX) {
+            exit_data->complex_data.data[exit_data->complex_data.data_cnt++] = *data;
+            free(data);
+        }
+    }
+
     pthread_exit(exit_data);
 }
 
-pthread_t*
-bcm_one_thread_creat(bcm_cfg* cfg, bcm_queue_t* q, bcm_threadtype_e ttype, int core, pthread_t* thread) {
+pthread_t *
+bcm_one_thread_creat(bcm_cfg *cfg, bcm_queue_t *q, bcm_threadtype_e ttype, int core, pthread_t *thread) {
     BBQ_INFO_LOG("thread type:%d core:%d", ttype, core);
 
-    bcm_thread_arg_s* arg = (bcm_thread_arg_s*)malloc(sizeof(bcm_thread_arg_s));  // 线程回收时free
+    bcm_thread_arg_s *arg = (bcm_thread_arg_s *)malloc(sizeof(bcm_thread_arg_s)); // 线程回收时free
     arg->cfg = cfg;
     arg->q = q;
     arg->ttype = ttype;
@@ -62,13 +147,13 @@ bcm_one_thread_creat(bcm_cfg* cfg, bcm_queue_t* q, bcm_threadtype_e ttype, int c
         core_id = (core_id + 1) < max_id ? (core_id + 1) : core_id; \
     } while (0)
 
-pthread_t* bcm_threads_creat(bcm_cfg* cfg, bcm_queue_t* q) {
+pthread_t *bcm_threads_creat(bcm_cfg *cfg, bcm_queue_t *q) {
     // 创建生产者消费者线程
     int ret;
     size_t thread_id = 0;
     int core_id = 0;
     size_t thread_cnt = cfg->producer_cnt + cfg->consumer_cnt;
-    pthread_t* threads = (pthread_t*)malloc(sizeof(pthread_t) * thread_cnt);  // 存储所有线程ID的数组
+    pthread_t *threads = (pthread_t *)malloc(sizeof(pthread_t) * thread_cnt); // 存储所有线程ID的数组
 
     // MPSC 或 SPMC 场景在第一个核心/超线程上分配单个生产者或消费者，然后将其他线程按顺序分配给核心/超线程。
     // MPMC，我们将生产者和消费者一一交错分配
@@ -89,8 +174,8 @@ pthread_t* bcm_threads_creat(bcm_cfg* cfg, bcm_queue_t* q) {
         }
     } else {
         // MPMC 或 只有生产者 或这有消费者，核心交错分配
-        uint32_t pcnt = cfg->producer_cnt;  // 生产者个数
-        uint32_t ccnt = cfg->consumer_cnt;  // 消费者个数
+        uint32_t pcnt = cfg->producer_cnt; // 生产者个数
+        uint32_t ccnt = cfg->consumer_cnt; // 消费者个数
         for (core_id = 0; core_id < cfg->cores_cnt && pcnt > 0 && ccnt > 0;) {
             if ((core_id & 1) == 0) {
                 // 偶数
@@ -117,12 +202,19 @@ pthread_t* bcm_threads_creat(bcm_cfg* cfg, bcm_queue_t* q) {
     return threads;
 }
 
-int main(int argc, char* argv[]) {
-    char* config;
+void bcm_report_generate(bcm_exit_data **exit_data, uint32_t thread_cnt) {
+    // bcm_report report;
+    for (uint32_t i = 0; i < thread_cnt; i++) {
+        BBQ_INFO_LOG("[%d] thread_id:%u", i, exit_data[i]->thread_id);
+    }
+}
+
+int main(int argc, char *argv[]) {
+    char *config;
     if (argc == 2) {
         config = argv[1];
     } else {
-        config = "/root/code/c/bbq/tests/benchmark/config/case1.ini";
+        config = "/root/code/c/bbq-ly/tests/benchmark/config/case1.ini";
         BBQ_ERR_LOG("!!!!!! not input config path, use default config:%s", config);
     }
 
@@ -143,7 +235,7 @@ int main(int argc, char* argv[]) {
     }
 
     // 创建线程
-    pthread_t* threads;
+    pthread_t *threads;
     threads = bcm_threads_creat(&cfg, &q);
     if (threads == NULL) {
         BBQ_ERR_LOG("pthread_arr is NULL");
@@ -152,10 +244,17 @@ int main(int argc, char* argv[]) {
 
     // 等待所有线程完成，回收数据
     uint32_t thread_cnt = cfg.producer_cnt + cfg.consumer_cnt;
-    bcm_exit_data** exit_data = (bcm_exit_data**)malloc(sizeof(bcm_exit_data**) * (thread_cnt));
+    bcm_exit_data **exit_data = (bcm_exit_data **)malloc(sizeof(bcm_exit_data **) * (thread_cnt));
     uint32_t i = 0;
     for (i = 0; i < thread_cnt; i++) {
-        pthread_join(threads[i], (void**)(&exit_data[i]));  // 等待每个线程结束
+        pthread_join(threads[i], (void **)(&exit_data[i])); // 等待每个线程结束
+    }
+
+    bcm_report_generate(exit_data, thread_cnt);
+
+    // 回收、释放数据
+    for (i = 0; i < thread_cnt; i++) {
+        exit_data_destory(exit_data[i]);
     }
 
     // 输出测试报告

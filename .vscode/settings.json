@@ -83,6 +83,7 @@
         "pthread.h": "c",
         "bcm_queue.h": "c",
         "rte_ring.h": "c",
-        "bcm_queue_dpdk.h": "c"
+        "bcm_queue_dpdk.h": "c",
+        "stdlib.h": "c"
     }
 }

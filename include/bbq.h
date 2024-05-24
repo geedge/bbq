@@ -18,7 +18,13 @@
 
 #ifndef __cplusplus
 // C
+
+#if 1
+typedef atomic_uint_fast64_t aotmic_uint64;
+#else
 typedef _Atomic uint64_t aotmic_uint64;
+#endif
+
 typedef aotmic_uint64 Cursor; // 块内的四种游标（version+off）
 typedef aotmic_uint64 Head;   // 向块的索引（version+idx）
 #else
