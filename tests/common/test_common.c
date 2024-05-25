@@ -1,12 +1,17 @@
+/*
+ * @Description: 描述信息
+ * @Date: 2024-05-25 10:55:48
+ * @LastEditTime: 2024-05-25 11:10:11
+ */
 
 #include "test_common.h"
+#include <string.h>
 #include "bbq.h"
 #include "iniparser.h"
-#include <string.h>
 
-int bxm_load_config(const char *config, test_cfg *cfg) {
+int bxm_load_config(const char* config, test_cfg* cfg) {
     // 加载配置
-    dictionary *ini = iniparser_load(config);
+    dictionary* ini = iniparser_load(config);
     if (ini == NULL) {
         return -1;
     }
@@ -14,38 +19,37 @@ int bxm_load_config(const char *config, test_cfg *cfg) {
     BBQ_INFO_LOG("--------------load config:%s--------------", config);
 
     // 获取键值
-    cfg->introduce = (char *)iniparser_getstring(ini, "base:introduce", "none");
-    BBQ_INFO_LOG("introduce:%s", cfg->introduce);
+    cfg->base.introduce = (char*)iniparser_getstring(ini, "base:introduce", "none");
+    BBQ_INFO_LOG("introduce:%s", cfg->base.introduce);
 
-    char *workload = (char *)iniparser_getstring(ini, "base:workload", "unknown");
-    cfg->workload = bcm_workload_str2enum(workload);
-    BBQ_INFO_LOG("workload:%s(%u)", workload, cfg->workload);
+    cfg->base.cores_cnt = iniparser_getint(ini, "base:cores_cnt", 0);
+    BBQ_INFO_LOG("cores_cnt:%u", cfg->base.cores_cnt);
 
-    char *ring_type = (char *)iniparser_getstring(ini, "base:ring_type", "unknown");
-    cfg->ring_type = bcm_ring_type_str2enum(ring_type);
-    BBQ_INFO_LOG("ring_type:%s(%u)", ring_type, cfg->ring_type);
+    char* ring_type = (char*)iniparser_getstring(ini, "ring:ring_type", "unknown");
+    cfg->ring.ring_type = bcm_ring_type_str2enum(ring_type);
+    BBQ_INFO_LOG("ring_type:%s(%u)", ring_type, cfg->ring.ring_type);
 
-    cfg->cores_cnt = iniparser_getint(ini, "base:cores_cnt", 0);
-    BBQ_INFO_LOG("cores_cnt:%u", cfg->cores_cnt);
-    if (cfg->cores_cnt <= 2) {
-        BBQ_ERR_LOG("atleast 2 cores");
-        perror("atleast 2 cores");
-    }
+    char* workload = (char*)iniparser_getstring(ini, "ring:workload", "unknown");
+    cfg->ring.workload = bcm_workload_str2enum(workload);
+    BBQ_INFO_LOG("workload:%s(%u)", workload, cfg->ring.workload);
 
-    cfg->entries_cnt = iniparser_getuint64(ini, "base:entries_cnt", 0);
-    BBQ_INFO_LOG("entries_cnt:%u", cfg->entries_cnt);
+    cfg->ring.entries_cnt = iniparser_getuint64(ini, "ring:entries_cnt", 0);
+    BBQ_INFO_LOG("entries_cnt:%u", cfg->ring.entries_cnt);
 
-    cfg->producer_cnt = iniparser_getint(ini, "base:producer_cnt", 0);
-    BBQ_INFO_LOG("producer_cnt:%u", cfg->producer_cnt);
+    cfg->ring.producer_cnt = iniparser_getint(ini, "ring:producer_cnt", 0);
+    BBQ_INFO_LOG("producer_cnt:%u", cfg->ring.producer_cnt);
 
-    cfg->consumer_cnt = iniparser_getint(ini, "base:consumer_cnt", 0);
-    BBQ_INFO_LOG("consumer_cnt:%u", cfg->consumer_cnt);
+    cfg->ring.consumer_cnt = iniparser_getint(ini, "ring:consumer_cnt", 0);
+    BBQ_INFO_LOG("consumer_cnt:%u", cfg->ring.consumer_cnt);
 
-    cfg->enqueue_cnt = iniparser_getint(ini, "base:enqueue_cnt", 0);
-    BBQ_INFO_LOG("enqueue_cnt:%lu", cfg->enqueue_cnt);
+    cfg->run.enqueue_cnt = iniparser_getint(ini, "run:enqueue_cnt", 0);
+    BBQ_INFO_LOG("enqueue_cnt:%lu", cfg->run.enqueue_cnt);
 
-    cfg->dequeue_cnt = iniparser_getint(ini, "base:dequeue_cnt", 0);
-    BBQ_INFO_LOG("dequeue_cnt:%lu", cfg->dequeue_cnt);
+    cfg->run.dequeue_cnt = iniparser_getint(ini, "run:dequeue_cnt", 0);
+    BBQ_INFO_LOG("dequeue_cnt:%lu", cfg->run.dequeue_cnt);
+
+    cfg->run.run_time = iniparser_getuint64(ini, "run:run_time", 0);
+    BBQ_INFO_LOG("run_time:%lu", cfg->run.run_time);
 
     // 释放dictionary对象
     iniparser_freedict(ini);
@@ -61,14 +65,14 @@ test_time_metric clock_time_get() {
     return metric;
 }
 
-time_t clock_nstime_diff(test_time_metric *slow, test_time_metric *fast) {
+time_t clock_nstime_diff(test_time_metric* slow, test_time_metric* fast) {
     time_t time_ns_fast = fast->st.tv_sec * 1000 * 1000 * 1000 + fast->st.tv_nsec;
     time_t time_ns_slow = slow->st.tv_sec * 1000 * 1000 * 1000 + slow->st.tv_nsec;
 
     return time_ns_fast - time_ns_slow;
 }
 
-test_workload_e bcm_workload_str2enum(const char *workload) {
+test_workload_e bcm_workload_str2enum(const char* workload) {
     if (strcmp(workload, "simple") == 0) {
         return TEST_WORKLOAD_SIMPLE;
     } else if (strcmp(workload, "complex") == 0) {
@@ -78,7 +82,7 @@ test_workload_e bcm_workload_str2enum(const char *workload) {
     return TEST_WORKLOAD_MAX;
 }
 
-test_ring_type bcm_ring_type_str2enum(const char *ring_type) {
+test_ring_type bcm_ring_type_str2enum(const char* ring_type) {
     if (strcmp(ring_type, "bbq") == 0) {
         return TEST_RING_TYPE_BBQ;
     } else if (strcmp(ring_type, "dpdk") == 0) {
