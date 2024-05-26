@@ -1,13 +1,15 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-26 11:48:18
+ * @LastEditTime: 2024-05-26 23:18:32
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
 #ifndef _TEST_COMMON_H_
 #define _TEST_COMMON_H_
 
+#include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <time.h>
 
 typedef enum {
@@ -68,8 +70,10 @@ typedef struct {
 } test_cfg;
 
 extern test_time_metric clock_time_get();
-extern test_time_metric clock_time_end(test_time_metric* last);
+extern test_time_metric clock_time_sub(test_time_metric now, test_time_metric last);
 extern int bxm_load_config(const char* config, test_cfg* cfg);
 extern test_workload_e bcm_workload_str2enum(const char* workload);
 extern test_ring_type bcm_ring_type_str2enum(const char* ring_type);
+extern bool clock_time_is_zero(test_time_metric* metric);
+extern bool timespec_is_after(const struct timespec* a, const struct timespec* b);
 #endif

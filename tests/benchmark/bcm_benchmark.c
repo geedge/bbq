@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-26 13:06:16
+ * @LastEditTime: 2024-05-26 23:59:29
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -21,20 +21,36 @@ typedef struct {
     bcm_queue_t* q;
 } bcm_thread_arg_s;
 
-typedef uint8_t bcm_simple_data;
+typedef uint8_t bcm_data;
 
 typedef struct {
-    bcm_simple_data* data;
+    bcm_data* data;
     uint64_t data_cnt;
 } bcm_complex_data;
 
-#define BCM_SIMPLE_DATA_MAGIC 234
 typedef struct {
     pthread_t thread_id;
     bcm_thread_arg_s* arg;
-    bcm_simple_data simple_data;
+    bcm_data simple_data;
     bcm_complex_data complex_data;
+    test_time_metric metric_start;
+    test_time_metric metric_end;
+    uint64_t run_times;
+    uint64_t ok_cnt;
 } bcm_exit_data;
+
+typedef struct {
+    test_time_metric use_time;
+    uint64_t run_times;
+    uint64_t ok_cnt;
+} bcm_merge_data;
+
+typedef struct {
+    bcm_merge_data producer;
+    bcm_merge_data consumer;
+} bcm_merge;
+
+#define BCM_SIMPLE_DATA_MAGIC 234
 
 // 记录已启动的线程
 atomic_uint bcm_thread_now = 0;
@@ -53,7 +69,7 @@ void bcmbusy_loopof() {
 }
 
 void bcm_wait_all_threads_ready(test_cfg* cfg) {
-    BBQ_INFO_LOG("wait other thread init....");
+    BBQ_DBG_LOG("wait other thread init....");
     uint32_t thread_cnt_max = cfg->ring.consumer_cnt +
                               cfg->ring.producer_cnt + 1;  //  +1个运行时间控制线程
 
@@ -62,7 +78,7 @@ void bcm_wait_all_threads_ready(test_cfg* cfg) {
         // 忙等待其他线程准备好
         sleep(1);
     }
-    BBQ_INFO_LOG("wait other thread init done!");
+    BBQ_DBG_LOG("wait other thread init done!");
 }
 
 bcm_exit_data* bcm_exit_data_create(bcm_thread_arg_s* t_arg) {
@@ -76,7 +92,7 @@ bcm_exit_data* bcm_exit_data_create(bcm_thread_arg_s* t_arg) {
     exit_data->thread_id = pthread_self();
     exit_data->simple_data = BCM_SIMPLE_DATA_MAGIC;
     if (t_arg->cfg->run.enqueue_cnt > 0) {
-        exit_data->complex_data.data = bbq_malloc(BBQ_MODULE_BCM, t_arg->cfg->run.enqueue_cnt * sizeof(bcm_simple_data));
+        exit_data->complex_data.data = bbq_malloc(BBQ_MODULE_BCM, t_arg->cfg->run.enqueue_cnt * sizeof(bcm_data));
     } else {
         exit_data->complex_data.data = NULL;
     }
@@ -106,6 +122,7 @@ void* bcm_thread_producer_start(void* arg) {
 
     bcm_wait_all_threads_ready(cfg);
 
+    exit_data->metric_start = clock_time_get();
     while (true) {
         if (cfg->run.enqueue_cnt > 0 && run_times >= cfg->run.enqueue_cnt) {
             // 控制次数的循环
@@ -119,7 +136,7 @@ void* bcm_thread_producer_start(void* arg) {
         if (cfg->ring.workload == TEST_WORKLOAD_SIMPLE) {
             ret = q->enqueue_f(q->ring, &(exit_data->simple_data));
         } else {
-            bcm_simple_data* data = bbq_malloc(BBQ_MODULE_BCM_EXIT_DATA, sizeof(bcm_simple_data));
+            bcm_data* data = bbq_malloc(BBQ_MODULE_BCM_EXIT_DATA, sizeof(bcm_data));
             if (data == NULL) {
                 BBQ_ERR_LOG("malloc falied");
                 exit(-1);
@@ -144,7 +161,11 @@ void* bcm_thread_producer_start(void* arg) {
         run_times++;
     }
 
-    BBQ_INFO_LOG("producer-----> en_ok:%lu", ok_cnt);
+    exit_data->metric_end = clock_time_sub(clock_time_get(), exit_data->metric_start);
+    exit_data->run_times = run_times;
+    exit_data->ok_cnt = ok_cnt;
+
+    BBQ_DBG_LOG("producer-----> en_ok:%lu", ok_cnt);
     pthread_exit(exit_data);
 }
 
@@ -163,13 +184,14 @@ void* bcm_thread_consumer_start(void* arg) {
 
     bcm_wait_all_threads_ready(cfg);
 
+    exit_data->metric_start = clock_time_get();
     while (true) {
         if (cfg->run.dequeue_cnt > 0 && run_times >= cfg->run.dequeue_cnt) {
             // 控制次数的循环
             break;
         }
 
-        bcm_simple_data* data = NULL;
+        bcm_data* data = NULL;
         ret = t_arg->q->dequeue_f(t_arg->q->ring, (void**)(&data));
         if (ret == 0) {
             if (*data != BCM_SIMPLE_DATA_MAGIC) {
@@ -196,7 +218,11 @@ void* bcm_thread_consumer_start(void* arg) {
         }
     }
 
-    BBQ_INFO_LOG("consumer-----> de_ok:%lu", ok_cnt);
+    exit_data->metric_end = clock_time_sub(clock_time_get(), exit_data->metric_start);
+    exit_data->run_times = run_times;
+    exit_data->ok_cnt = ok_cnt;
+
+    BBQ_DBG_LOG("consumer-----> de_ok:%lu", ok_cnt);
     pthread_exit(exit_data);
 }
 
@@ -213,7 +239,7 @@ void* bcm_thread_run_time_set(void* arg) {
 
 pthread_t*
 bcm_one_thread_creat(test_cfg* cfg, bcm_queue_t* q, test_thread_type_e ttype, int core, pthread_t* thread) {
-    BBQ_INFO_LOG("thread type:%d core:%d", ttype, core);
+    BBQ_DBG_LOG("thread type:%d core:%d", ttype, core);
 
     bcm_thread_arg_s* arg = (bcm_thread_arg_s*)bbq_malloc(BBQ_MODULE_BCM, sizeof(bcm_thread_arg_s));  // 线程回收时free
     arg->cfg = cfg;
@@ -292,11 +318,67 @@ void bcm_threads_destory(pthread_t* threads) {
     bbq_free(BBQ_MODULE_BCM, threads);
 }
 
+void bcm_merge_merge_data(bcm_exit_data** exit_data, uint32_t thread_cnt, bcm_merge* merge) {
+    test_time_metric p_start = {0};
+    test_time_metric p_end = {0};
+    test_time_metric c_start = {0};
+    test_time_metric c_end = {0};
+
+    for (uint32_t i = 0; i < thread_cnt; i++) {
+        // 根据生产者/消费者 线程最早开始和最晚结束，记录时间
+        if (exit_data[i]->arg->ttype == TEST_THREAD_PRODUCER) {
+            if (clock_time_is_zero(&p_start) || timespec_is_after(&p_start.timestamp, &exit_data[i]->metric_start.timestamp)) {
+                p_start = exit_data[i]->metric_start;
+            }
+
+            if (timespec_is_after(&exit_data[i]->metric_start.timestamp, &p_end.timestamp)) {
+                p_end = exit_data[i]->metric_start;
+            }
+
+            merge->producer.run_times += exit_data[i]->run_times;
+            merge->producer.ok_cnt += exit_data[i]->ok_cnt;
+        } else {
+            if (clock_time_is_zero(&c_start) || timespec_is_after(&c_start.timestamp, &exit_data[i]->metric_start.timestamp)) {
+                c_start = exit_data[i]->metric_start;
+            }
+
+            if (timespec_is_after(&exit_data[i]->metric_start.timestamp, &c_end.timestamp)) {
+                c_end = exit_data[i]->metric_start;
+            }
+
+            merge->consumer.run_times += exit_data[i]->run_times;
+            merge->consumer.ok_cnt += exit_data[i]->ok_cnt;
+        }
+    }
+
+    merge->producer.use_time = clock_time_sub(p_end, p_start);
+    merge->consumer.use_time = clock_time_sub(c_end, c_start);
+}
+
+void bcm_report_printf(bcm_merge_data* data, test_thread_type_e ttype) {
+    char name[10] = {0};
+
+    if (ttype == TEST_THREAD_PRODUCER) {
+        strcpy(name, "producer");
+    } else {
+        strcpy(name, "consumer");
+    }
+
+    printf("---------------------------%s--------------------------\n", name);
+    printf("use time :%lu.%lus\n", data->use_time.timestamp.tv_sec,
+           data->use_time.timestamp.tv_nsec / 1000 / 1000);
+    printf("run times :%lu\n", data->run_times);
+    printf("ok_cnt :%lu\n", data->ok_cnt);
+    printf("throughput :%lu\n", data->ok_cnt / data->use_time.timestamp.tv_sec);
+}
+
 void bcm_report_generate(bcm_exit_data** exit_data, uint32_t thread_cnt) {
     // test_report report;
-    for (uint32_t i = 0; i < thread_cnt; i++) {
-        BBQ_INFO_LOG("[%d] thread_id:%u", i, exit_data[i]->thread_id);
-    }
+
+    bcm_merge merge;
+    bcm_merge_merge_data(exit_data, thread_cnt, &merge);
+    bcm_report_printf(&merge.producer, TEST_THREAD_PRODUCER);
+    bcm_report_printf(&merge.consumer, TEST_THREAD_CONSUMER);
 }
 
 #if 1
@@ -350,7 +432,7 @@ int main(int argc, char* argv[]) {
         pthread_join(threads[i], (void**)(&exit_data[i]));  // 等待每个线程结束
     }
 
-    test_time_metric diff = clock_time_end(&metric_start);
+    test_time_metric diff = clock_time_sub(clock_time_get(), metric_start);
     BBQ_INFO_LOG("use time: %lu.%lu s", diff.timestamp.tv_sec, diff.timestamp.tv_nsec);
 
     // 生成benchmark报告
@@ -364,12 +446,6 @@ int main(int argc, char* argv[]) {
     bcm_threads_destory(threads);
     bcm_queue_destory(&q);
     bbq_memory_info();
-
-    if (bbq_malloc_free_equal()) {
-        BBQ_INFO_LOG("all memory free");
-    } else {
-        BBQ_ERR_LOG("memory not all free");
-    }
     return 0;
 }
 #else

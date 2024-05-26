@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-26 13:02:53
+ * @LastEditTime: 2024-05-26 23:06:11
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -460,24 +460,6 @@ static void* bbq_memset(void* data, size_t size) {
     }
 }
 
-void bbq_memory_info() {
-#ifdef BBQ_MEMORY
-    for (int i = 0; i < BBQ_MODULE_MAX; i++) {
-        uint64_t malloc_cnt = atomic_load(&bbq_memory_g[i].malloc_cnt);
-        uint64_t free_cnt = atomic_load(&bbq_memory_g[i].free_cnt);
-        if (malloc_cnt == 0 && free_cnt == 0) {
-            continue;
-        }
-
-        BBQ_INFO_LOG("[%d] malloc:%lu free:%lu", i,
-                     atomic_load(&bbq_memory_g[i].malloc_cnt),
-                     atomic_load(&bbq_memory_g[i].free_cnt));
-    }
-#else
-    BBQ_INFO_LOG("BBQ_MEMORY is not define");
-#endif
-}
-
 bool bbq_malloc_free_equal() {
 #ifdef BBQ_MEMORY
     bool ret = true;
@@ -493,5 +475,27 @@ bool bbq_malloc_free_equal() {
 #else
     BBQ_INFO_LOG("BBQ_MEMORY is not define");
     return true;
+#endif
+}
+
+void bbq_memory_info() {
+#ifdef BBQ_MEMORY
+    for (int i = 0; i < BBQ_MODULE_MAX; i++) {
+        uint64_t malloc_cnt = atomic_load(&bbq_memory_g[i].malloc_cnt);
+        uint64_t free_cnt = atomic_load(&bbq_memory_g[i].free_cnt);
+        if (malloc_cnt == 0 && free_cnt == 0) {
+            continue;
+        }
+
+        BBQ_INFO_LOG("[%d] malloc:%lu free:%lu", i,
+                     atomic_load(&bbq_memory_g[i].malloc_cnt),
+                     atomic_load(&bbq_memory_g[i].free_cnt));
+    }
+
+    if (bbq_malloc_free_equal()) {
+        BBQ_INFO_LOG("all memory free");
+    } else {
+        BBQ_ERR_LOG("memory not all free");
+    }
 #endif
 }

@@ -1,7 +1,7 @@
 /*
  * @Description: 描述信息
  * @Date: 2024-05-25 10:55:48
- * @LastEditTime: 2024-05-26 11:52:50
+ * @LastEditTime: 2024-05-26 23:52:08
  */
 
 #include "test_common.h"
@@ -66,12 +66,35 @@ test_time_metric clock_time_get() {
     return metric;
 }
 
-test_time_metric clock_time_end(test_time_metric* last) {
-    test_time_metric now = clock_time_get();
+bool clock_time_is_zero(test_time_metric* metric) {
+    return metric->timestamp.tv_sec == 0 && metric->timestamp.tv_nsec;
+}
+
+bool timespec_is_after(const struct timespec* a, const struct timespec* b) {
+    if (a->tv_sec > b->tv_sec) {
+        // a的秒数大于b的秒数，所以a在b之后
+        return true;
+    } else if (a->tv_sec == b->tv_sec && a->tv_nsec > b->tv_nsec) {
+        // a和b的秒数相同，但a的纳秒数大于b的纳秒数，所以a在b之后
+        return true;
+    }
+    // 否则，a不在b之后
+    return false;
+}
+
+test_time_metric clock_time_sub(test_time_metric now, test_time_metric last) {
     test_time_metric diff = {
-        .timestamp.tv_sec = now.timestamp.tv_sec - last->timestamp.tv_sec,
-        .timestamp.tv_nsec = now.timestamp.tv_nsec - last->timestamp.tv_nsec,
+        .timestamp.tv_sec = now.timestamp.tv_sec - last.timestamp.tv_sec,
+        .timestamp.tv_nsec = now.timestamp.tv_nsec - last.timestamp.tv_nsec,
     };
+
+    if (now.timestamp.tv_nsec > last.timestamp.tv_nsec) {
+        diff.timestamp.tv_nsec = now.timestamp.tv_nsec - last.timestamp.tv_nsec;
+    } else {
+        // 从秒借位
+        diff.timestamp.tv_sec--;
+        diff.timestamp.tv_nsec = 1000 * 1000 * 1000 + now.timestamp.tv_nsec - last.timestamp.tv_nsec;
+    }
 
     return diff;
 }
