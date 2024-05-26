@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-25 11:14:47
+ * @LastEditTime: 2024-05-26 12:38:41
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -17,7 +17,7 @@ int bcm_queue_init_dpdk(test_cfg* cfg, bcm_queue_t* q) {
     }
 
     q->ring_type = TEST_RING_TYPE_DPDK;
-    q->dpdk_ring = rte_ring_create("dpdk_ring", cfg->ring.entries_cnt, rte_socket_id(), RING_F_MP_RTS_ENQ | RING_F_MC_RTS_DEQ);
+    q->ring = (void*)rte_ring_create("dpdk_ring", cfg->ring.entries_cnt, rte_socket_id(), RING_F_MP_RTS_ENQ | RING_F_MC_RTS_DEQ);
     if (q->dpdk_ring == NULL) {
         return BBQ_NULL_PTR;
     }
@@ -25,8 +25,6 @@ int bcm_queue_init_dpdk(test_cfg* cfg, bcm_queue_t* q) {
     q->ring_free_f = (bcm_ring_free_f)rte_ring_free;
     q->enqueue_f = (bcm_ring_enqueue_f)rte_ring_enqueue;
     q->dequeue_f = (bcm_ring_dequeue_f)rte_ring_dequeue;
-    // q->ring_full_f = (bcm_ring_dequeue_f)rte_ring_full;
-    // q->ring_empty_f = (bcm_ring_dequeue_f)rte_ring_empty;
 
     return BBQ_OK;
 }
@@ -34,7 +32,7 @@ int bcm_queue_init_dpdk(test_cfg* cfg, bcm_queue_t* q) {
 int bcm_queue_init_bbq(test_cfg* cfg, bcm_queue_t* q) {
     bbq_queue_s* ring;
 
-    q->ring = (void*)bbq_ring_create("bbq_ring", cfg->ring.entries_cnt, 0, BBQ_RETRY_NEW);
+    q->bbq_ring = bbq_ring_create("bbq_ring", cfg->ring.entries_cnt, 0, BBQ_RETRY_NEW);
     if (q->ring == NULL) {
         BBQ_ERR_LOG("bbq_ring_create failed");
         return BBQ_NULL_PTR;
@@ -53,7 +51,8 @@ int bcm_queue_init(test_cfg* cfg, bcm_queue_t* q) {
     }
 
     int ret = -1;
-    switch (cfg->ring.ring_type) {
+    q->ring_type = cfg->ring.ring_type;
+    switch (q->ring_type) {
         case TEST_RING_TYPE_DPDK:
             ret = bcm_queue_init_dpdk(cfg, q);
             break;

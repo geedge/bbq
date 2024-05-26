@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-25 11:08:48
+ * @LastEditTime: 2024-05-26 11:48:18
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -17,7 +17,7 @@ typedef enum {
 } test_thread_type_e;
 
 typedef struct {
-    struct timespec st;  // 系统时间戳
+    struct timespec timestamp;  // 系统时间戳
     // uint64_t cycles;     // cpu运行的cycle
 } test_time_metric;
 
@@ -68,7 +68,7 @@ typedef struct {
 } test_cfg;
 
 extern test_time_metric clock_time_get();
-extern time_t clock_nstime_diff(test_time_metric* slow, test_time_metric* fast);
+extern test_time_metric clock_time_end(test_time_metric* last);
 extern int bxm_load_config(const char* config, test_cfg* cfg);
 extern test_workload_e bcm_workload_str2enum(const char* workload);
 extern test_ring_type bcm_ring_type_str2enum(const char* ring_type);

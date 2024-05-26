@@ -1,11 +1,12 @@
 /*
  * @Description: 描述信息
  * @Date: 2024-05-25 10:55:48
- * @LastEditTime: 2024-05-25 11:10:11
+ * @LastEditTime: 2024-05-26 11:52:50
  */
 
 #include "test_common.h"
 #include <string.h>
+#include <sys/time.h>
 #include "bbq.h"
 #include "iniparser.h"
 
@@ -58,18 +59,21 @@ int bxm_load_config(const char* config, test_cfg* cfg) {
 
 test_time_metric clock_time_get() {
     test_time_metric metric = {0};
-    struct timespec st;
+    struct timespec timestamp;
 
-    clock_gettime(CLOCK_MONOTONIC, &metric.st);
+    clock_gettime(CLOCK_MONOTONIC, &metric.timestamp);
 
     return metric;
 }
 
-time_t clock_nstime_diff(test_time_metric* slow, test_time_metric* fast) {
-    time_t time_ns_fast = fast->st.tv_sec * 1000 * 1000 * 1000 + fast->st.tv_nsec;
-    time_t time_ns_slow = slow->st.tv_sec * 1000 * 1000 * 1000 + slow->st.tv_nsec;
+test_time_metric clock_time_end(test_time_metric* last) {
+    test_time_metric now = clock_time_get();
+    test_time_metric diff = {
+        .timestamp.tv_sec = now.timestamp.tv_sec - last->timestamp.tv_sec,
+        .timestamp.tv_nsec = now.timestamp.tv_nsec - last->timestamp.tv_nsec,
+    };
 
-    return time_ns_fast - time_ns_slow;
+    return diff;
 }
 
 test_workload_e bcm_workload_str2enum(const char* workload) {
