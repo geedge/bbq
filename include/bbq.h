@@ -7,12 +7,12 @@
 #ifndef _BBQ_H_
 #define _BBQ_H_
 
-#include "bbq_errno.h"
-#include "bbq_log.h"
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include "bbq_errno.h"
+#include "bbq_log.h"
 
 #define BBQ_MEMORY
 
@@ -91,16 +91,36 @@ typedef struct {
 typedef enum {
     BBQ_MODULE_QUEUE = 0,
     BBQ_MODULE_UTEST,
+
     BBQ_MODULE_BCM,
+    BBQ_MODULE_BCM_EXIT_DATA,
 
     BBQ_MODULE_MAX,
 } bbq_module_e; // 用于内存测试
 
-extern bbq_queue_s *bbq_ring_create(const char *name, uint32_t count,
-                                    int socket_id, bbq_policy_e policy);
+extern bbq_queue_s* bbq_ring_create(const char* name, uint32_t count, int socket_id, bbq_policy_e policy);
 
-extern bbq_queue_s *bbq_ring_create_bnbs(const char *name, size_t bn, size_t bs, int socket_id, bbq_policy_e policy);
-extern void bbq_ring_free(bbq_queue_s *q);
-extern int bbq_enqueue(bbq_queue_s *q, bbq_data data);
-extern int bbq_dequeue(bbq_queue_s *q, bbq_data *deq_data);
+extern bbq_queue_s* bbq_ring_create_bnbs(const char* name, size_t bn, size_t bs, int socket_id, bbq_policy_e policy);
+extern void bbq_ring_free(bbq_queue_s* q);
+extern int bbq_enqueue(bbq_queue_s* q, bbq_data data);
+extern int bbq_dequeue(bbq_queue_s* q, bbq_data* deq_data);
+
+#define BBQ_MALLOC(module, ptr) bbq_malloc(module, ptr)
+
+#ifdef BBQ_MEMORY
+#define BBQ_FREE(module, ptr)               \
+    do {                                    \
+        if (ptr == NULL) {                  \
+            perror("try to free NULL ptr"); \
+        }                                   \
+        bbq_free(module, ptr);              \
+        ptr = NULL;                         \
+    } while (0)
+#else
+#define BBQ_FREE(module, ptr)  \
+    do {                       \
+        bbq_free(module, ptr); \
+    } while (0)
+#endif
+
 #endif

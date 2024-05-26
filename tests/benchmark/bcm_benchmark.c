@@ -69,13 +69,17 @@ bcm_exit_data* bcm_exit_data_create(bcm_thread_arg_s* t_arg) {
     bcm_exit_data* exit_data = (bcm_exit_data*)bbq_malloc(BBQ_MODULE_BCM, sizeof(bcm_exit_data));
     if (exit_data == NULL) {
         BBQ_ERR_LOG("malloc failed");
-        perror("malloc failed");
+        exit(-1);
     }
 
     exit_data->arg = t_arg;
     exit_data->thread_id = pthread_self();
     exit_data->simple_data = BCM_SIMPLE_DATA_MAGIC;
-    exit_data->complex_data.data = bbq_malloc(BBQ_MODULE_BCM, t_arg->cfg->run.enqueue_cnt * sizeof(bcm_simple_data));
+    if (t_arg->cfg->run.enqueue_cnt > 0) {
+        exit_data->complex_data.data = bbq_malloc(BBQ_MODULE_BCM, t_arg->cfg->run.enqueue_cnt * sizeof(bcm_simple_data));
+    } else {
+        exit_data->complex_data.data = NULL;
+    }
     exit_data->complex_data.data_cnt = 0;
 
     return exit_data;
@@ -102,21 +106,33 @@ void* bcm_thread_producer_start(void* arg) {
 
     bcm_wait_all_threads_ready(cfg);
 
-    while (bcm_threads_running && (cfg->run.enqueue_cnt == 0 || run_times < cfg->run.enqueue_cnt)) {
+    while (true) {
+        if (cfg->run.enqueue_cnt > 0 && run_times >= cfg->run.enqueue_cnt) {
+            // 控制次数的循环
+            break;
+        }
+
+        if (!bcm_threads_running) {
+            // 控制时间的循环，时间一到生产者退出
+            break;
+        }
         if (cfg->ring.workload == TEST_WORKLOAD_SIMPLE) {
             ret = q->enqueue_f(q->ring, &(exit_data->simple_data));
         } else {
-            bcm_simple_data* data = bbq_malloc(BBQ_MODULE_BCM, sizeof(bcm_simple_data));
+            bcm_simple_data* data = bbq_malloc(BBQ_MODULE_BCM_EXIT_DATA, sizeof(bcm_simple_data));
             if (data == NULL) {
                 BBQ_ERR_LOG("malloc falied");
-                perror("malloc falied");
+                exit(-1);
             }
             *data = BCM_SIMPLE_DATA_MAGIC;
+            if (exit_data->complex_data.data != NULL) {
+                exit_data->complex_data.data[exit_data->complex_data.data_cnt] = *data;
+            }
             ret = q->enqueue_f(q->ring, data);
             if (ret == 0) {
-                exit_data->complex_data.data[exit_data->complex_data.data_cnt++] = *data;
+                exit_data->complex_data.data_cnt++;
             } else {
-                bbq_free(BBQ_MODULE_BCM, data);
+                bbq_free(BBQ_MODULE_BCM_EXIT_DATA, data);
             }
             bcmbusy_loopof();
         }
@@ -147,24 +163,37 @@ void* bcm_thread_consumer_start(void* arg) {
 
     bcm_wait_all_threads_ready(cfg);
 
-    while (bcm_threads_running && (cfg->run.dequeue_cnt == 0 || run_times < cfg->run.dequeue_cnt)) {
+    while (true) {
+        if (cfg->run.dequeue_cnt > 0 && run_times >= cfg->run.dequeue_cnt) {
+            // 控制次数的循环
+            break;
+        }
+
         bcm_simple_data* data = NULL;
         ret = t_arg->q->dequeue_f(t_arg->q->ring, (void**)(&data));
         if (ret == 0) {
             if (*data != BCM_SIMPLE_DATA_MAGIC) {
                 BBQ_ERR_LOG("the obtained data is not consistent with the expectation, expect:%u actual:%u", BCM_SIMPLE_DATA_MAGIC, *data);
-                perror("the obtained data is not consistent with the expectation");
+                exit(-1);
             }
 
             if (t_arg->cfg->ring.workload == TEST_WORKLOAD_COMPLEX) {
-                exit_data->complex_data.data[exit_data->complex_data.data_cnt++] = *data;
-                bbq_free(BBQ_MODULE_BCM, data);
+                if (exit_data->complex_data.data != NULL) {
+                    exit_data->complex_data.data[exit_data->complex_data.data_cnt] = *data;
+                }
+                exit_data->complex_data.data_cnt++;
+                bbq_free(BBQ_MODULE_BCM_EXIT_DATA, data);
                 bcmbusy_loopof();
             }
             ok_cnt++;
         }
 
         run_times++;
+
+        if (!bcm_threads_running && ret != 0) {
+            // 控制时间的循环，时间到，需要等队列里的数据都消费完再退出
+            break;
+        }
     }
 
     BBQ_INFO_LOG("consumer-----> de_ok:%lu", ok_cnt);
@@ -270,6 +299,7 @@ void bcm_report_generate(bcm_exit_data** exit_data, uint32_t thread_cnt) {
     }
 }
 
+#if 1
 int main(int argc, char* argv[]) {
     char* config;
     if (argc == 2) {
@@ -333,7 +363,6 @@ int main(int argc, char* argv[]) {
     bbq_free(BBQ_MODULE_BCM, exit_data);
     bcm_threads_destory(threads);
     bcm_queue_destory(&q);
-
     bbq_memory_info();
 
     if (bbq_malloc_free_equal()) {
@@ -343,3 +372,81 @@ int main(int argc, char* argv[]) {
     }
     return 0;
 }
+#else
+
+void* pstart(void* arg) {
+    bbq_queue_s* q = (bbq_queue_s*)arg;
+
+    int ret = 0;
+    uint32_t ok_cnt = 0;
+
+    for (int i = 0; i < 3; i++) {
+        int* data = (int*)malloc(sizeof(int));
+        *data = 123;
+        if (bbq_enqueue(q, data) == 0) {
+            ok_cnt++;
+            printf("enqueue ok:%p\n", data);
+        } else {
+            free(data);
+        }
+    }
+
+    printf("p ok_cnt:%u\n", ok_cnt);
+}
+
+void* cstart(void* arg) {
+    bbq_queue_s* q = (bbq_queue_s*)arg;
+    int* data;
+    int ret = 0;
+    uint32_t ok_cnt = 0;
+
+    for (int i = 0; i < 1; i++) {
+        ret = bbq_dequeue(q, (void**)&data);
+        if (ret == 0) {
+            if (*data != 123) {
+                printf(".........!!!!!!!!  *data !=123,  is :%d\n", *data);
+            }
+            printf("try free %p\n", data);
+            free(data);
+            ok_cnt++;
+        } else {
+            // printf("dequeue err ret:%d\n", ret);
+        }
+    }
+
+    printf("c ok_cnt:%u\n", ok_cnt);
+}
+
+int main() {
+#define TCNT 10
+    bbq_queue_s* q = bbq_ring_create_bnbs("bbq_ring", 5, 1, 0, BBQ_RETRY_NEW);
+    if (q == NULL) {
+        BBQ_ERR_LOG("bbq_ring_create failed");
+        return BBQ_NULL_PTR;
+    }
+
+#if 0
+    pthread_t thread_arr[TCNT];
+    for (int i = 0; i < TCNT; i++) {
+        if (i % 2 == 0) {
+            pthread_create(&thread_arr[i], NULL, pstart, q);
+        } else {
+            pthread_create(&thread_arr[i], NULL, cstart, q);
+        }
+    }
+
+    for (int i = 0; i < TCNT; i++) {
+        pthread_join(thread_arr[i], NULL);  // 等待每个线程结束
+    }
+#else
+    pstart(q);
+    cstart(q);
+    pstart(q);
+#endif
+
+    printf("test,333,,\n");
+    bbq_ring_free(q);
+
+    printf("end...\n");
+}
+#endif

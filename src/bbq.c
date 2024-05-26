@@ -156,7 +156,7 @@ int bbq_enqueue(bbq_queue_s* q, bbq_data data) {
     while (true) {
         // 获取当前phead，转为索引后获取到当前的blk
         uint64_t ph = atomic_load(&q->phead);
-        bbq_block_s* blk = &(q->blocks[idx(q, ph)]);
+        bbq_block_s* blk = &(q->blocks[idx(q, ph) % q->bn]);  // TODO:check
 
         bbq_queue_state_s ps;
         bbq_queue_state_s state = allocate_entry(q, blk);
@@ -186,7 +186,7 @@ int bbq_enqueue(bbq_queue_s* q, bbq_data data) {
 int bbq_dequeue(bbq_queue_s* q, bbq_data* deq_data) {
     while (true) {
         uint64_t ch = atomic_load(&q->chead);
-        bbq_block_s* blk = &(q->blocks[idx(q, ch)]);
+        bbq_block_s* blk = &(q->blocks[idx(q, ch) % q->bn]);  // TODO:check???
 
         bbq_data data;
         bbq_queue_state_s state;
@@ -290,7 +290,7 @@ static bbq_queue_state_s advance_phead(bbq_queue_s* q, uint64_t ph) {
     fetch_max(&n_blk->committed, set_cur_vsn(q, head_vsn(q, ph) + 1));
     fetch_max(&n_blk->allocated, set_cur_vsn(q, head_vsn(q, ph) + 1));
 
-    // 索引+1，当超过索引范围，也就是循环下一轮块时，version+1
+    // 索引+1，当超过索引范围，也就是循环下一轮块时，version+1????
     fetch_max(&q->phead, ph + 1);
 
     // printf("!! [AF]next block, allocated_vsn:%u allocated_idx:%u\n", cur_vsn(n_blk.allocated), off(n_blk.allocated));
@@ -363,7 +363,8 @@ static bbq_data consume_entry(bbq_queue_s* q, bbq_entry_desc_s* e) {
 }
 
 static bool advance_chead(bbq_queue_s* q, uint64_t ch, uint64_t ver) {
-    bbq_block_s* n_blk = &(q->blocks[(idx(q, ch) + 1) % q->bn]);
+    bbq_block_s* n_blk = &(q->blocks[(idx(q, ch) + 1) % q->bn]);  // TODO: check
+
     uint64_t committed = atomic_load(&n_blk->committed);
 
     // printf("ZZ [B]advance_chead, chead_vsn:%u chead_idx:%u\n", head_vsn(chead),idx(chead));
@@ -445,7 +446,6 @@ void* bbq_malloc(bbq_module_e module, size_t size) {
 }
 
 void bbq_free(bbq_module_e module, void* ptr) {
-    printf("free :%p\n", ptr);
 #ifdef BBQ_MEMORY
     if (ptr != NULL) {
         atomic_fetch_add(&bbq_memory_g[module].free_cnt, 1);

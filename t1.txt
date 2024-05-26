@@ -1,0 +1,68 @@
+[ERR][main:279:/root/code/c/bbq-ly/tests/benchmark/bcm_benchmark.c]!!!!!! not input config path, use default config:/root/code/c/bbq-ly/tests/benchmark/config/case1.ini
+[INFO][bxm_load_config:20:/root/code/c/bbq-ly/tests/common/test_common.c]--------------load config:/root/code/c/bbq-ly/tests/benchmark/config/case1.ini--------------
+[INFO][bxm_load_config:24:/root/code/c/bbq-ly/tests/common/test_common.c]introduce:case-1
+[INFO][bxm_load_config:27:/root/code/c/bbq-ly/tests/common/test_common.c]cores_cnt:4
+[INFO][bxm_load_config:31:/root/code/c/bbq-ly/tests/common/test_common.c]ring_type:bbq(0)
+[INFO][bxm_load_config:35:/root/code/c/bbq-ly/tests/common/test_common.c]workload:simple(0)
+[INFO][bxm_load_config:38:/root/code/c/bbq-ly/tests/common/test_common.c]entries_cnt:32768
+[INFO][bxm_load_config:41:/root/code/c/bbq-ly/tests/common/test_common.c]producer_cnt:1
+[INFO][bxm_load_config:44:/root/code/c/bbq-ly/tests/common/test_common.c]consumer_cnt:1
+[INFO][bxm_load_config:47:/root/code/c/bbq-ly/tests/common/test_common.c]enqueue_cnt:2000000
+[INFO][bxm_load_config:50:/root/code/c/bbq-ly/tests/common/test_common.c]dequeue_cnt:2000000
+[INFO][bxm_load_config:53:/root/code/c/bbq-ly/tests/common/test_common.c]run_time:0
+malloc :0x55a60f605030
+malloc :0x55a60f6076e0
+malloc :0x55a60f607880
+malloc :0x55a60f60def0
+malloc :0x55a60f614560
+malloc :0x55a60f61abd0
+malloc :0x55a60f621240
+malloc :0x55a60f6278b0
+malloc :0x55a60f62df20
+malloc :0x55a60f634590
+malloc :0x55a60f63ac00
+malloc :0x55a60f641270
+malloc :0x55a60f6042d0
+[INFO][bcm_one_thread_creat:187:/root/code/c/bbq-ly/tests/benchmark/bcm_benchmark.c]thread type:0 core:0
+malloc :0x55a60f6045d0
+[INFO][bcm_one_thread_creat:187:/root/code/c/bbq-ly/tests/benchmark/bcm_benchmark.c]thread type:1 core:1
+malloc :0x55a60f604560
+malloc :0x55a60f604850
+malloc :0x7f2b9c000b70
+malloc :0x7f2ba8e15010
+[INFO][bcm_wait_all_threads_ready:56:/root/code/c/bbq-ly/tests/benchmark/bcm_benchmark.c]wait other thread init....
+malloc :0x7f2ba4000b70
+malloc :0x7f2ba8c2c010
+[INFO][bcm_wait_all_threads_ready:56:/root/code/c/bbq-ly/tests/benchmark/bcm_benchmark.c]wait other thread init....
+[INFO][bcm_wait_all_threads_ready:56:/root/code/c/bbq-ly/tests/benchmark/bcm_benchmark.c]wait other thread init....
+[INFO][bcm_wait_all_threads_ready:65:/root/code/c/bbq-ly/tests/benchmark/bcm_benchmark.c]wait other thread init done!
+[INFO][bcm_wait_all_threads_ready:65:/root/code/c/bbq-ly/tests/benchmark/bcm_benchmark.c]wait other thread init done!
+[INFO][bcm_wait_all_threads_ready:65:/root/code/c/bbq-ly/tests/benchmark/bcm_benchmark.c]wait other thread init done!
+[INFO][bcm_thread_consumer_start:170:/root/code/c/bbq-ly/tests/benchmark/bcm_benchmark.c]consumer-----> de_ok:32760
+[INFO][bcm_thread_producer_start:131:/root/code/c/bbq-ly/tests/benchmark/bcm_benchmark.c]producer-----> en_ok:68807
+[INFO][main:324:/root/code/c/bbq-ly/tests/benchmark/bcm_benchmark.c]use time: 1.82553657 s
+[INFO][bcm_report_generate:269:/root/code/c/bbq-ly/tests/benchmark/bcm_benchmark.c][0] thread_id:2852124352
+[INFO][bcm_report_generate:269:/root/code/c/bbq-ly/tests/benchmark/bcm_benchmark.c][1] thread_id:2843731648
+try free :0x7f2ba8c2c010
+try free :0x55a60f6045d0
+try free :0x7f2ba4000b70
+try free :0x7f2ba8e15010
+try free :0x55a60f604560
+try free :0x7f2b9c000b70
+try free :0x55a60f604850
+try free :0x55a60f6042d0
+try free :0x55a60f607880
+try free :0x55a60f60def0
+try free :0x55a60f614560
+try free :0x55a60f61abd0
+try free :0x55a60f621240
+try free :0x55a60f6278b0
+try free :0x55a60f62df20
+try free :0x55a60f634590
+try free :0x55a60f63ac00
+try free :0x55a60f641270
+try free :0x55a60f6076e0
+try free :0x55a60f605030
+[INFO][bbq_memory_info:472:/root/code/c/bbq-ly/src/bbq.c][0] malloc:12 free:12
+[INFO][bbq_memory_info:472:/root/code/c/bbq-ly/src/bbq.c][2] malloc:8 free:8
+[INFO][main:340:/root/code/c/bbq-ly/tests/benchmark/bcm_benchmark.c]all memory free
