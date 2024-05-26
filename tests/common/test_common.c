@@ -1,7 +1,7 @@
 /*
  * @Description: 描述信息
  * @Date: 2024-05-25 10:55:48
- * @LastEditTime: 2024-05-26 23:52:08
+ * @LastEditTime: 2024-05-27 00:07:38
  */
 
 #include "test_common.h"
@@ -67,7 +67,7 @@ test_time_metric clock_time_get() {
 }
 
 bool clock_time_is_zero(test_time_metric* metric) {
-    return metric->timestamp.tv_sec == 0 && metric->timestamp.tv_nsec;
+    return metric->timestamp.tv_sec == 0 && metric->timestamp.tv_nsec == 0;
 }
 
 bool timespec_is_after(const struct timespec* a, const struct timespec* b) {

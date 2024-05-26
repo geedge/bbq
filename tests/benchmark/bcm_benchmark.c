@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-26 23:59:29
+ * @LastEditTime: 2024-05-27 00:20:40
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -69,7 +69,7 @@ void bcmbusy_loopof() {
 }
 
 void bcm_wait_all_threads_ready(test_cfg* cfg) {
-    BBQ_DBG_LOG("wait other thread init....");
+    BBQ_INFO_LOG("wait other thread init....");
     uint32_t thread_cnt_max = cfg->ring.consumer_cnt +
                               cfg->ring.producer_cnt + 1;  //  +1个运行时间控制线程
 
@@ -78,7 +78,7 @@ void bcm_wait_all_threads_ready(test_cfg* cfg) {
         // 忙等待其他线程准备好
         sleep(1);
     }
-    BBQ_DBG_LOG("wait other thread init done!");
+    BBQ_INFO_LOG("wait other thread init done!");
 }
 
 bcm_exit_data* bcm_exit_data_create(bcm_thread_arg_s* t_arg) {
@@ -161,11 +161,11 @@ void* bcm_thread_producer_start(void* arg) {
         run_times++;
     }
 
-    exit_data->metric_end = clock_time_sub(clock_time_get(), exit_data->metric_start);
+    exit_data->metric_end = clock_time_get();
     exit_data->run_times = run_times;
     exit_data->ok_cnt = ok_cnt;
 
-    BBQ_DBG_LOG("producer-----> en_ok:%lu", ok_cnt);
+    BBQ_INFO_LOG("producer-----> en_ok:%lu", ok_cnt);
     pthread_exit(exit_data);
 }
 
@@ -218,11 +218,11 @@ void* bcm_thread_consumer_start(void* arg) {
         }
     }
 
-    exit_data->metric_end = clock_time_sub(clock_time_get(), exit_data->metric_start);
+    exit_data->metric_end = clock_time_get();
     exit_data->run_times = run_times;
     exit_data->ok_cnt = ok_cnt;
 
-    BBQ_DBG_LOG("consumer-----> de_ok:%lu", ok_cnt);
+    BBQ_INFO_LOG("consumer-----> de_ok:%lu", ok_cnt);
     pthread_exit(exit_data);
 }
 
@@ -239,7 +239,7 @@ void* bcm_thread_run_time_set(void* arg) {
 
 pthread_t*
 bcm_one_thread_creat(test_cfg* cfg, bcm_queue_t* q, test_thread_type_e ttype, int core, pthread_t* thread) {
-    BBQ_DBG_LOG("thread type:%d core:%d", ttype, core);
+    BBQ_INFO_LOG("thread type:%d core:%d", ttype, core);
 
     bcm_thread_arg_s* arg = (bcm_thread_arg_s*)bbq_malloc(BBQ_MODULE_BCM, sizeof(bcm_thread_arg_s));  // 线程回收时free
     arg->cfg = cfg;
@@ -332,7 +332,7 @@ void bcm_merge_merge_data(bcm_exit_data** exit_data, uint32_t thread_cnt, bcm_me
             }
 
             if (timespec_is_after(&exit_data[i]->metric_start.timestamp, &p_end.timestamp)) {
-                p_end = exit_data[i]->metric_start;
+                p_end = exit_data[i]->metric_end;
             }
 
             merge->producer.run_times += exit_data[i]->run_times;
@@ -343,7 +343,7 @@ void bcm_merge_merge_data(bcm_exit_data** exit_data, uint32_t thread_cnt, bcm_me
             }
 
             if (timespec_is_after(&exit_data[i]->metric_start.timestamp, &c_end.timestamp)) {
-                c_end = exit_data[i]->metric_start;
+                c_end = exit_data[i]->metric_end;
             }
 
             merge->consumer.run_times += exit_data[i]->run_times;
@@ -375,7 +375,7 @@ void bcm_report_printf(bcm_merge_data* data, test_thread_type_e ttype) {
 void bcm_report_generate(bcm_exit_data** exit_data, uint32_t thread_cnt) {
     // test_report report;
 
-    bcm_merge merge;
+    bcm_merge merge = {0};
     bcm_merge_merge_data(exit_data, thread_cnt, &merge);
     bcm_report_printf(&merge.producer, TEST_THREAD_PRODUCER);
     bcm_report_printf(&merge.consumer, TEST_THREAD_CONSUMER);
@@ -387,7 +387,7 @@ int main(int argc, char* argv[]) {
     if (argc == 2) {
         config = argv[1];
     } else {
-        config = "/root/code/c/bbq-ly/tests/benchmark/config/case1.ini";
+        config = "/root/code/c/bbq-ly/tests/benchmark/config/case1_simple_bbq.ini";
         BBQ_ERR_LOG("!!!!!! not input config path, use default config:%s", config);
     }
 
