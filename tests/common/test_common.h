@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-27 11:04:02
+ * @LastEditTime: 2024-05-27 15:20:10
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -38,6 +38,8 @@ typedef enum {
     TEST_WORKLOAD_MAX,
 } test_workload_e;
 
+#define TEST_RING_TYPE_BBQ_STR "bbq"
+#define TEST_RING_TYPE_DPDK_STR "dpdk"
 typedef enum {
     TEST_RING_TYPE_BBQ,
     TEST_RING_TYPE_DPDK,
@@ -56,6 +58,7 @@ typedef struct {
     uint32_t consumer_cnt;    // 消费者个数
     test_workload_e workload; // 负载模式
     uint64_t entries_cnt;     // ring初始化时分配entry的个数
+    uint32_t block_count;     // bbq block个数，为0时表示根据entries_cnt自动计算
 } test_cfg_ring;
 
 typedef struct {
@@ -70,11 +73,12 @@ typedef struct {
     test_cfg_run run;
 } test_cfg;
 
-extern test_time_metric clock_time_get();
-extern test_time_metric clock_time_sub(test_time_metric now, test_time_metric last);
-extern int bxm_load_config(const char *config, test_cfg *cfg);
-extern test_workload_e bcm_workload_str2enum(const char *workload);
-extern test_ring_type bcm_ring_type_str2enum(const char *ring_type);
-extern bool clock_time_is_zero(test_time_metric *metric);
-extern bool timespec_is_after(const struct timespec *a, const struct timespec *b);
+extern test_time_metric test_clock_time_get();
+extern test_time_metric test_clock_time_sub(test_time_metric now, test_time_metric last);
+extern int test_load_config(const char *config, const char *ring_type, test_cfg *cfg);
+extern test_workload_e test_workload_str2enum(const char *workload);
+extern test_ring_type test_ring_type_str2enum(const char *ring_type);
+extern bool test_clock_time_is_zero(test_time_metric *metric);
+extern bool test_timespec_is_after(const struct timespec *a, const struct timespec *b);
+extern char *test_ring_type_enum2str(test_ring_type ring_type);
 #endif

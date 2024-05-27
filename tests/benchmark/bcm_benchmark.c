@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-27 11:26:12
+ * @LastEditTime: 2024-05-27 15:07:28
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -122,7 +122,7 @@ void *bcm_thread_producer_start(void *arg) {
 
     bcm_wait_all_threads_ready(cfg);
 
-    exit_data->metric_start = clock_time_get();
+    exit_data->metric_start = test_clock_time_get();
     while (true) {
         if (cfg->run.enqueue_cnt > 0 && run_times >= cfg->run.enqueue_cnt) {
             // 控制次数的循环
@@ -161,7 +161,7 @@ void *bcm_thread_producer_start(void *arg) {
         run_times++;
     }
 
-    exit_data->metric_end = clock_time_get();
+    exit_data->metric_end = test_clock_time_get();
     exit_data->run_times = run_times;
     exit_data->ok_cnt = ok_cnt;
 
@@ -184,7 +184,7 @@ void *bcm_thread_consumer_start(void *arg) {
 
     bcm_wait_all_threads_ready(cfg);
 
-    exit_data->metric_start = clock_time_get();
+    exit_data->metric_start = test_clock_time_get();
     while (true) {
         if (cfg->run.dequeue_cnt > 0 && run_times >= cfg->run.dequeue_cnt) {
             // 控制次数的循环
@@ -218,7 +218,7 @@ void *bcm_thread_consumer_start(void *arg) {
         }
     }
 
-    exit_data->metric_end = clock_time_get();
+    exit_data->metric_end = test_clock_time_get();
     exit_data->run_times = run_times;
     exit_data->ok_cnt = ok_cnt;
 
@@ -327,22 +327,22 @@ void bcm_merge_merge_data(bcm_exit_data **exit_data, uint32_t thread_cnt, bcm_me
     for (uint32_t i = 0; i < thread_cnt; i++) {
         // 根据生产者/消费者 线程最早开始和最晚结束，记录时间
         if (exit_data[i]->arg->ttype == TEST_THREAD_PRODUCER) {
-            if (clock_time_is_zero(&p_start) || timespec_is_after(&p_start.timestamp, &exit_data[i]->metric_start.timestamp)) {
+            if (test_clock_time_is_zero(&p_start) || test_timespec_is_after(&p_start.timestamp, &exit_data[i]->metric_start.timestamp)) {
                 p_start = exit_data[i]->metric_start;
             }
 
-            if (timespec_is_after(&exit_data[i]->metric_start.timestamp, &p_end.timestamp)) {
+            if (test_timespec_is_after(&exit_data[i]->metric_start.timestamp, &p_end.timestamp)) {
                 p_end = exit_data[i]->metric_end;
             }
 
             merge->producer.run_times += exit_data[i]->run_times;
             merge->producer.ok_cnt += exit_data[i]->ok_cnt;
         } else {
-            if (clock_time_is_zero(&c_start) || timespec_is_after(&c_start.timestamp, &exit_data[i]->metric_start.timestamp)) {
+            if (test_clock_time_is_zero(&c_start) || test_timespec_is_after(&c_start.timestamp, &exit_data[i]->metric_start.timestamp)) {
                 c_start = exit_data[i]->metric_start;
             }
 
-            if (timespec_is_after(&exit_data[i]->metric_start.timestamp, &c_end.timestamp)) {
+            if (test_timespec_is_after(&exit_data[i]->metric_start.timestamp, &c_end.timestamp)) {
                 c_end = exit_data[i]->metric_end;
             }
 
@@ -351,8 +351,8 @@ void bcm_merge_merge_data(bcm_exit_data **exit_data, uint32_t thread_cnt, bcm_me
         }
     }
 
-    merge->producer.use_time = clock_time_sub(p_end, p_start);
-    merge->consumer.use_time = clock_time_sub(c_end, c_start);
+    merge->producer.use_time = test_clock_time_sub(p_end, p_start);
+    merge->consumer.use_time = test_clock_time_sub(c_end, c_start);
 }
 
 void bcm_report_printf(bcm_merge_data *data, test_thread_type_e ttype) {
@@ -379,6 +379,7 @@ void bcm_report_generate(test_cfg *cfg, bcm_exit_data **exit_data, uint32_t thre
     bcm_merge merge = {0};
     bcm_merge_merge_data(exit_data, thread_cnt, &merge);
 
+    BBQ_CLOR_PRINT("ring类型:%s", test_ring_type_enum2str(cfg->ring.ring_type));
     BBQ_CLOR_PRINT("简介:%s", cfg->base.introduce);
     BBQ_CLOR_PRINT("配置:%s", cfg->base.name);
     bcm_report_printf(&merge.producer, TEST_THREAD_PRODUCER);
@@ -388,11 +389,15 @@ void bcm_report_generate(test_cfg *cfg, bcm_exit_data **exit_data, uint32_t thre
 #if 1
 int main(int argc, char *argv[]) {
     char *config;
-    if (argc == 2) {
+    char *ring_type;
+
+    if (argc == 3) {
         config = argv[1];
+        ring_type = argv[2];
     } else {
-        config = "/root/code/c/bbq-ly/tests/benchmark/config/case1_simple_bbq_spsc.ini";
-        BBQ_ERR_LOG("!!!!!! not input config path, use default config:%s", config);
+        config = "/root/code/c/bbq-ly/tests/benchmark/config/case1_simple_spsc.ini";
+        ring_type = "bbq";
+        BBQ_ERR_LOG("use default config, ringt_type:bbq config:%s", config);
     }
 
     char thread_name[128] = {0};
@@ -401,7 +406,7 @@ int main(int argc, char *argv[]) {
 
     // 加载配置
     test_cfg cfg;
-    if (bxm_load_config(config, &cfg) != 0) {
+    if (test_load_config(config, ring_type, &cfg) != 0) {
         BBQ_ERR_LOG("input config path");
         return -1;
     }
@@ -422,7 +427,7 @@ int main(int argc, char *argv[]) {
         return ret;
     }
 
-    test_time_metric metric_start = clock_time_get();
+    test_time_metric metric_start = test_clock_time_get();
     pthread_t thread_run_time;
 
     pthread_create(&thread_run_time, NULL, bcm_thread_run_time_set, &cfg);
@@ -436,7 +441,7 @@ int main(int argc, char *argv[]) {
         pthread_join(threads[i], (void **)(&exit_data[i])); // 等待每个线程结束
     }
 
-    test_time_metric diff = clock_time_sub(clock_time_get(), metric_start);
+    test_time_metric diff = test_clock_time_sub(test_clock_time_get(), metric_start);
     BBQ_INFO_LOG("use time: %lu.%lu s", diff.timestamp.tv_sec, diff.timestamp.tv_nsec);
 
     // 生成benchmark报告

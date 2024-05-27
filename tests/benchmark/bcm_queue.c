@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-27 11:32:42
+ * @LastEditTime: 2024-05-27 15:23:41
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -32,11 +32,20 @@ int bcm_queue_init_dpdk(test_cfg *cfg, bcm_queue_t *q) {
 int bcm_queue_init_bbq(test_cfg *cfg, bcm_queue_t *q) {
     bbq_queue_s *ring;
 
-    q->bbq_ring = bbq_ring_create("bbq_ring", cfg->ring.entries_cnt, 0, BBQ_RETRY_NEW);
+    if (cfg->ring.block_count == 0) {
+        q->bbq_ring = bbq_ring_create("bbq_ring", cfg->ring.entries_cnt, 0, BBQ_RETRY_NEW);
+    } else {
+        q->bbq_ring = bbq_ring_create_bnbs("bbq_ring", cfg->ring.block_count,
+                                           cfg->ring.entries_cnt / cfg->ring.block_count,
+                                           0, BBQ_RETRY_NEW);
+    }
+
     if (q->ring == NULL) {
         BBQ_ERR_LOG("bbq_ring_create failed");
         return BBQ_NULL_PTR;
     }
+
+    BBQ_INFO_LOG("block number:%lu size:%lu", q->bbq_ring->bn, q->bbq_ring->bs);
 
     q->ring_free_f = (bcm_ring_free_f)bbq_ring_free;
     q->enqueue_f = (bcm_ring_enqueue_f)bbq_enqueue;
