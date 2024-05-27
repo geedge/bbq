@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-27 15:07:28
+ * @LastEditTime: 2024-05-27 19:11:29
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -21,7 +21,10 @@ typedef struct {
     bcm_queue_t *q;
 } bcm_thread_arg_s;
 
-typedef uint8_t bcm_data;
+typedef struct bcm_benchmark {
+    uint8_t data;                  // 数据
+    test_time_metric enqueue_time; // 入队时间
+} bcm_data;
 
 typedef struct {
     bcm_data *data;
@@ -37,12 +40,14 @@ typedef struct {
     test_time_metric metric_end;
     uint64_t run_times;
     uint64_t ok_cnt;
+    uint64_t latency_ns; // 消费者有效
 } bcm_exit_data;
 
 typedef struct {
     test_time_metric use_time;
     uint64_t run_times;
     uint64_t ok_cnt;
+    uint64_t latency_ns; // 消费者有效
 } bcm_merge_data;
 
 typedef struct {
@@ -90,13 +95,14 @@ bcm_exit_data *bcm_exit_data_create(bcm_thread_arg_s *t_arg) {
 
     exit_data->arg = t_arg;
     exit_data->thread_id = pthread_self();
-    exit_data->simple_data = BCM_SIMPLE_DATA_MAGIC;
+    exit_data->simple_data.data = BCM_SIMPLE_DATA_MAGIC;
     if (t_arg->cfg->run.enqueue_cnt > 0) {
         exit_data->complex_data.data = bbq_malloc(BBQ_MODULE_BCM, t_arg->cfg->run.enqueue_cnt * sizeof(bcm_data));
     } else {
         exit_data->complex_data.data = NULL;
     }
     exit_data->complex_data.data_cnt = 0;
+    exit_data->latency_ns = 0;
 
     return exit_data;
 }
@@ -141,7 +147,8 @@ void *bcm_thread_producer_start(void *arg) {
                 BBQ_ERR_LOG("malloc falied");
                 exit(-1);
             }
-            *data = BCM_SIMPLE_DATA_MAGIC;
+            data->enqueue_time = test_clock_time_get();
+            data->data = BCM_SIMPLE_DATA_MAGIC;
             if (exit_data->complex_data.data != NULL) {
                 exit_data->complex_data.data[exit_data->complex_data.data_cnt] = *data;
             }
@@ -177,6 +184,7 @@ void *bcm_thread_consumer_start(void *arg) {
     test_cfg *cfg = t_arg->cfg;
     bcm_queue_t *q = t_arg->q;
     bcm_exit_data *exit_data = bcm_exit_data_create(t_arg);
+    uint64_t latency_ns = 0;
 
     char thread_name[128] = {0};
     snprintf(thread_name, sizeof(thread_name), "consumer:%x", exit_data->thread_id);
@@ -194,7 +202,10 @@ void *bcm_thread_consumer_start(void *arg) {
         bcm_data *data = NULL;
         ret = t_arg->q->dequeue_f(t_arg->q->ring, (void **)(&data));
         if (ret == 0) {
-            if (*data != BCM_SIMPLE_DATA_MAGIC) {
+            test_time_metric latency = test_clock_time_sub(test_clock_time_get(), data->enqueue_time);
+            latency_ns += latency.timestamp.tv_sec * 1000 * 1000 * 1000 + latency.timestamp.tv_nsec;
+
+            if (data->data != BCM_SIMPLE_DATA_MAGIC) {
                 BBQ_ERR_LOG("the obtained data is not consistent with the expectation, expect:%u actual:%u", BCM_SIMPLE_DATA_MAGIC, *data);
                 exit(-1);
             }
@@ -221,6 +232,7 @@ void *bcm_thread_consumer_start(void *arg) {
     exit_data->metric_end = test_clock_time_get();
     exit_data->run_times = run_times;
     exit_data->ok_cnt = ok_cnt;
+    exit_data->latency_ns = latency_ns;
 
     BBQ_INFO_LOG("consumer-----> de_ok:%lu", ok_cnt);
     pthread_exit(exit_data);
@@ -348,6 +360,7 @@ void bcm_merge_merge_data(bcm_exit_data **exit_data, uint32_t thread_cnt, bcm_me
 
             merge->consumer.run_times += exit_data[i]->run_times;
             merge->consumer.ok_cnt += exit_data[i]->ok_cnt;
+            merge->consumer.latency_ns += exit_data[i]->latency_ns;
         }
     }
 
@@ -371,6 +384,9 @@ void bcm_report_printf(bcm_merge_data *data, test_thread_type_e ttype) {
     BBQ_CLOR_PRINT("执行次数 : %lu", data->run_times);
     BBQ_CLOR_PRINT("成功次数 : %lu", data->ok_cnt);
     BBQ_CLOR_PRINT("吞吐 :%.0lf/s", data->ok_cnt / use_time);
+    if (ttype == TEST_THREAD_CONSUMER) {
+        BBQ_CLOR_PRINT("数据延迟 :%.0lf 纳秒", data->latency_ns / data->ok_cnt);
+    }
 }
 
 void bcm_report_generate(test_cfg *cfg, bcm_exit_data **exit_data, uint32_t thread_cnt) {
