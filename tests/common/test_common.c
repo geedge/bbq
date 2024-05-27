@@ -1,36 +1,42 @@
 /*
  * @Description: 描述信息
  * @Date: 2024-05-25 10:55:48
- * @LastEditTime: 2024-05-27 00:07:38
+ * @LastEditTime: 2024-05-27 11:05:06
  */
 
 #include "test_common.h"
-#include <string.h>
-#include <sys/time.h>
 #include "bbq.h"
 #include "iniparser.h"
+#include <string.h>
+#include <sys/time.h>
 
-int bxm_load_config(const char* config, test_cfg* cfg) {
+int bxm_load_config(const char *config, test_cfg *cfg) {
     // 加载配置
-    dictionary* ini = iniparser_load(config);
+    dictionary *ini = iniparser_load(config);
     if (ini == NULL) {
         return -1;
     }
 
     BBQ_INFO_LOG("--------------load config:%s--------------", config);
 
+    strncpy(cfg->base.name, config, sizeof(cfg->base.name) - 1);
+    cfg->base.name[sizeof(cfg->base.name) - 1] = '\0';
+
     // 获取键值
-    cfg->base.introduce = (char*)iniparser_getstring(ini, "base:introduce", "none");
+    char *introduce = (char *)iniparser_getstring(ini, "base:introduce", "none");
+    strncpy(cfg->base.introduce, introduce, sizeof(cfg->base.introduce) - 1);
+    cfg->base.introduce[sizeof(cfg->base.introduce) - 1] = '\0'; // 手工写上 \0
+
     BBQ_INFO_LOG("introduce:%s", cfg->base.introduce);
 
     cfg->base.cores_cnt = iniparser_getint(ini, "base:cores_cnt", 0);
     BBQ_INFO_LOG("cores_cnt:%u", cfg->base.cores_cnt);
 
-    char* ring_type = (char*)iniparser_getstring(ini, "ring:ring_type", "unknown");
+    char *ring_type = (char *)iniparser_getstring(ini, "ring:ring_type", "unknown");
     cfg->ring.ring_type = bcm_ring_type_str2enum(ring_type);
     BBQ_INFO_LOG("ring_type:%s(%u)", ring_type, cfg->ring.ring_type);
 
-    char* workload = (char*)iniparser_getstring(ini, "ring:workload", "unknown");
+    char *workload = (char *)iniparser_getstring(ini, "ring:workload", "unknown");
     cfg->ring.workload = bcm_workload_str2enum(workload);
     BBQ_INFO_LOG("workload:%s(%u)", workload, cfg->ring.workload);
 
@@ -66,11 +72,11 @@ test_time_metric clock_time_get() {
     return metric;
 }
 
-bool clock_time_is_zero(test_time_metric* metric) {
+bool clock_time_is_zero(test_time_metric *metric) {
     return metric->timestamp.tv_sec == 0 && metric->timestamp.tv_nsec == 0;
 }
 
-bool timespec_is_after(const struct timespec* a, const struct timespec* b) {
+bool timespec_is_after(const struct timespec *a, const struct timespec *b) {
     if (a->tv_sec > b->tv_sec) {
         // a的秒数大于b的秒数，所以a在b之后
         return true;
@@ -99,7 +105,7 @@ test_time_metric clock_time_sub(test_time_metric now, test_time_metric last) {
     return diff;
 }
 
-test_workload_e bcm_workload_str2enum(const char* workload) {
+test_workload_e bcm_workload_str2enum(const char *workload) {
     if (strcmp(workload, "simple") == 0) {
         return TEST_WORKLOAD_SIMPLE;
     } else if (strcmp(workload, "complex") == 0) {
@@ -109,7 +115,7 @@ test_workload_e bcm_workload_str2enum(const char* workload) {
     return TEST_WORKLOAD_MAX;
 }
 
-test_ring_type bcm_ring_type_str2enum(const char* ring_type) {
+test_ring_type bcm_ring_type_str2enum(const char *ring_type) {
     if (strcmp(ring_type, "bbq") == 0) {
         return TEST_RING_TYPE_BBQ;
     } else if (strcmp(ring_type, "dpdk") == 0) {

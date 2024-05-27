@@ -1,4 +1,10 @@
 #!/bin/bash
+###
+# @Author: liuyu
+# @LastEditTime: 2024-05-27 11:33:04
+# @Email: liuyu@geedgenetworks.com
+# @Describe: TODO
+###
 
 # 检查参数数量
 if [ "$#" -ne 2 ]; then
@@ -34,7 +40,6 @@ for INI_FILE in "$CONFIG_DIR"/*.ini; do
 
         # 休眠3秒
         echo "--------------------------------------------------------------------"
-        sleep 3
     else
         echo "Warning: '$INI_FILE' is not a regular file, skipping."
     fi

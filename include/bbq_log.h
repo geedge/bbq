@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu@geedgenetworks.com
- * @LastEditTime: 2024-05-24 13:49:42
+ * @LastEditTime: 2024-05-27 10:44:12
  * @Describe:调试信息
  */
 #ifndef _BBQ_LOG_H_
@@ -27,4 +27,10 @@
     do {                                                                                  \
         printf("[INFO][%s:%d:%s]" fmt "\n", __func__, __LINE__, __FILE__, ##__VA_ARGS__); \
     } while (0)
+
+#define BBQ_CLOR_PRINT(fmt, ...)                           \
+    do {                                                   \
+        printf("\033[32m" fmt "\033[0m\n", ##__VA_ARGS__); \
+    } while (0)
+
 #endif
