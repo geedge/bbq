@@ -87,6 +87,7 @@
         "stdlib.h": "c",
         "bbq_common.h": "c",
         "bcm_common.h": "c",
-        "test_common.h": "c"
+        "test_common.h": "c",
+        "numa.h": "c"
     }
 }

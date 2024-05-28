@@ -40,7 +40,7 @@ TEST(boundary, full_empty) {
     int ret = 0;
     bbq_queue_s *q;
     // 1.初始队列为空，入队失败
-    q = bbq_ring_create_bnbs("bbq_ring", bn, bs, 0, BBQ_RETRY_NEW);
+    q = bbq_ring_create_bnbs_with_socket("bbq_ring", bn, bs, 0, BBQ_RETRY_NEW);
     EXPECT_TRUE(q != NULL) << "FAILED-1";
 
     int cnt = bn * bs;
@@ -89,7 +89,7 @@ TEST(multi_pc, pquick) {
     uint64_t thread_exec_times = bs * 10;
     pthread_t *threads = NULL; // 存储所有线程ID的数组
 
-    bbq_queue_s *q = bbq_ring_create_bnbs("bbq_ring", bn, bs, 0, BBQ_RETRY_NEW);
+    bbq_queue_s *q = bbq_ring_create_bnbs_with_socket("bbq_ring", bn, bs, 0, BBQ_RETRY_NEW);
     EXPECT_TRUE(q != NULL) << "FAILED-1";
 
     // 创建生产者消费者线程

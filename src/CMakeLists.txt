@@ -6,3 +6,5 @@ set(LIBRARY_OUTPUT_PATH ${LIB_PATH}) #设置库生成目录
 
 add_library(${BBQ_LIB} STATIC ${SRC_LIST}) #生成静态库
 # add_library(${BBQ_LIB} SHARED ${SRC_LIST}) #生成动态库
+
+target_link_libraries(${BBQ_LIB} numa) # 链接库

@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-28 14:58:30
+ * @LastEditTime: 2024-05-28 17:48:54
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -37,15 +37,15 @@ int bcm_queue_init_bbq(test_cfg *cfg, bcm_queue_t *q) {
     bbq_queue_s *ring;
 
     if (cfg->ring.block_count == 0) {
-        q->bbq_ring = bbq_ring_create("bbq_ring", cfg->ring.entries_cnt, 0, BBQ_RETRY_NEW);
+        q->bbq_ring = bbq_ring_create_with_socket("bbq_ring", cfg->ring.entries_cnt, 0, BBQ_RETRY_NEW);
     } else {
-        q->bbq_ring = bbq_ring_create_bnbs("bbq_ring", cfg->ring.block_count,
-                                           cfg->ring.entries_cnt / cfg->ring.block_count,
-                                           0, BBQ_RETRY_NEW);
+        q->bbq_ring = bbq_ring_create_bnbs_with_socket("bbq_ring", cfg->ring.block_count,
+                                                       cfg->ring.entries_cnt / cfg->ring.block_count,
+                                                       0, BBQ_RETRY_NEW);
     }
 
     if (q->ring == NULL) {
-        BBQ_ERR_LOG("bbq_ring_create failed");
+        BBQ_ERR_LOG("bbq_ring_create_with_socket failed");
         return BBQ_NULL_PTR;
     }
 

@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-28 14:09:37
+ * @LastEditTime: 2024-05-28 17:09:59
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -73,6 +73,13 @@ typedef struct {
     test_cfg_run run;
 } test_cfg;
 
+typedef enum {
+    TEST_MODULE_UTEST,
+    TEST_MODULE_BCM,
+    TEST_MODULE_BCM_EXIT_DATA,
+    TEST_MODULE_MAX,
+} test_module_e;
+
 extern test_time_metric test_clock_time_get();
 extern test_time_metric test_clock_time_sub(test_time_metric now, test_time_metric last);
 extern int test_load_config(const char *config, const char *ring_type, test_cfg *cfg);
@@ -83,4 +90,7 @@ extern bool test_timespec_is_after(const struct timespec *a, const struct timesp
 extern char *test_ring_type_enum2str(test_ring_type ring_type);
 extern uint64_t test_clock_time_to_ns(test_time_metric *metric);
 extern uint64_t test_clock_time_to_double(test_time_metric *metric);
+extern void *test_malloc(test_module_e module, size_t size);
+extern void test_free(test_module_e module, void *ptr);
+extern void test_memory_info();
 #endif

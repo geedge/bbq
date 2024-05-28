@@ -1,7 +1,7 @@
 /*
  * @Description: 描述信息
  * @Date: 2024-05-25 10:55:48
- * @LastEditTime: 2024-05-28 14:07:09
+ * @LastEditTime: 2024-05-28 17:22:01
  */
 
 #include "test_common.h"
@@ -9,6 +9,62 @@
 #include "iniparser.h"
 #include <string.h>
 #include <sys/time.h>
+
+typedef struct {
+    aotmic_uint64 malloc_cnt;
+    aotmic_uint64 free_cnt;
+} test_memory_s;
+
+test_memory_s test_memory_g[TEST_MODULE_MAX] = {0};
+
+void *test_malloc(test_module_e module, size_t size) {
+    void *ptr = malloc(size);
+    if (ptr != NULL) {
+        atomic_fetch_add(&test_memory_g[module].malloc_cnt, 1);
+    }
+
+    return ptr;
+}
+
+void test_free(test_module_e module, void *ptr) {
+    if (ptr != NULL) {
+        atomic_fetch_add(&test_memory_g[module].free_cnt, 1);
+    }
+    free(ptr);
+}
+
+bool test_malloc_free_equal() {
+    bool ret = true;
+    for (int i = 0; i < TEST_MODULE_MAX; i++) {
+        uint64_t malloc_cnt = atomic_load(&test_memory_g[i].malloc_cnt);
+        uint64_t free_cnt = atomic_load(&test_memory_g[i].free_cnt);
+        if (malloc_cnt != free_cnt) {
+            BBQ_ERR_LOG("[module:%d] malloc:%lu free:%lu, test malloc-free not equal\n", i, malloc_cnt, free_cnt);
+            ret = false;
+        }
+    }
+    return ret;
+}
+
+void test_memory_info() {
+    for (int i = 0; i < TEST_MODULE_MAX; i++) {
+        uint64_t malloc_cnt = atomic_load(&test_memory_g[i].malloc_cnt);
+        uint64_t free_cnt = atomic_load(&test_memory_g[i].free_cnt);
+        if (malloc_cnt == 0 && free_cnt == 0) {
+            continue;
+        }
+
+        BBQ_INFO_LOG("[%d] malloc:%lu free:%lu", i,
+                     atomic_load(&test_memory_g[i].malloc_cnt),
+                     atomic_load(&test_memory_g[i].free_cnt));
+    }
+
+    if (test_malloc_free_equal()) {
+        BBQ_INFO_LOG("all memory free");
+    } else {
+        BBQ_ERR_LOG("memory not all free");
+    }
+}
 
 int test_load_config(const char *config, const char *ring_type, test_cfg *cfg) {
     // 加载配置
