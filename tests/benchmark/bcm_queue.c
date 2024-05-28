@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-27 15:23:41
+ * @LastEditTime: 2024-05-28 14:58:30
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -27,6 +27,10 @@ int bcm_queue_init_dpdk(test_cfg *cfg, bcm_queue_t *q) {
     q->dequeue_f = (bcm_ring_dequeue_f)rte_ring_dequeue;
 
     return BBQ_OK;
+}
+
+int bbq_rint_ret_full(int ret) {
+    return ret == BBQ_QUEUE_FULL;
 }
 
 int bcm_queue_init_bbq(test_cfg *cfg, bcm_queue_t *q) {

@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-28 14:50:31
+ * @LastEditTime: 2024-05-28 15:27:03
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -40,16 +40,18 @@ typedef struct {
     test_time_metric metric_end;
     uint64_t run_times;
     uint64_t ok_cnt;
-    uint64_t latency_ns;      // 仅消费者有效，数据停留的时延
-    uint64_t opok_latency_ns; // 成功操作的时延
+    uint64_t latency_ns;        // 仅消费者有效，数据停留的时延
+    uint64_t op_ok_latency_ns;  // 成功操作的时延
+    uint64_t op_err_latency_ns; // 操作失败的时延， 如满队入队，空队出队
 } bcm_exit_data;
 
 typedef struct {
     test_time_metric use_time;
     uint64_t run_times;
     uint64_t ok_cnt;
-    uint64_t latency_ns;      // 仅消费者有效，数据停留的时延
-    uint64_t opok_latency_ns; // 成功操作的时延
+    uint64_t latency_ns;        // 仅消费者有效，数据停留的时延
+    uint64_t op_ok_latency_ns;  // 成功操作的时延
+    uint64_t op_err_latency_ns; // 操作失败的时延， 如满队入队，空队出队
 } bcm_merge_data;
 
 typedef struct {
@@ -144,7 +146,8 @@ void *bcm_thread_producer_start(void *arg) {
     bcm_queue_t *q = t_arg->q;
     bcm_exit_data *exit_data = bcm_exit_data_create(t_arg);
     char thread_name[128] = {0};
-    uint64_t opok_latency_ns = 0;
+    uint64_t op_ok_latency_ns = 0;
+    uint64_t op_err_latency_ns = 0;
 
     test_time_metric op_latency = {0};
 
@@ -188,7 +191,9 @@ void *bcm_thread_producer_start(void *arg) {
 
         if (ret == 0) {
             ok_cnt++;
-            opok_latency_ns += test_clock_time_to_ns(&op_latency);
+            op_ok_latency_ns += test_clock_time_to_ns(&op_latency);
+        } else {
+            op_err_latency_ns += test_clock_time_to_ns(&op_latency);
         }
 
         run_times++;
@@ -198,7 +203,8 @@ void *bcm_thread_producer_start(void *arg) {
     exit_data->run_times = run_times;
     exit_data->ok_cnt = ok_cnt;
 
-    exit_data->opok_latency_ns = opok_latency_ns;
+    exit_data->op_ok_latency_ns = op_ok_latency_ns;
+    exit_data->op_err_latency_ns = op_err_latency_ns;
 
     BBQ_INFO_LOG("producer-----> en_ok:%lu", ok_cnt);
     pthread_exit(exit_data);
@@ -214,7 +220,8 @@ void *bcm_thread_consumer_start(void *arg) {
     bcm_exit_data *exit_data = bcm_exit_data_create(t_arg);
     uint64_t latency_ns = 0;
     test_time_metric op_latency = {0};
-    uint64_t opok_latency_ns;
+    uint64_t op_ok_latency_ns;
+    uint64_t op_err_latency_ns = 0;
 
     char thread_name[128] = {0};
     snprintf(thread_name, sizeof(thread_name), "consumer:%x", exit_data->thread_id);
@@ -260,7 +267,9 @@ void *bcm_thread_consumer_start(void *arg) {
             }
 
             ok_cnt++;
-            opok_latency_ns += test_clock_time_to_ns(&op_latency);
+            op_ok_latency_ns += test_clock_time_to_ns(&op_latency);
+        } else {
+            op_err_latency_ns += test_clock_time_to_ns(&op_latency);
         }
 
         run_times++;
@@ -275,7 +284,8 @@ void *bcm_thread_consumer_start(void *arg) {
     exit_data->run_times = run_times;
     exit_data->ok_cnt = ok_cnt;
     exit_data->latency_ns = latency_ns;
-    exit_data->opok_latency_ns = opok_latency_ns;
+    exit_data->op_ok_latency_ns = op_ok_latency_ns;
+    exit_data->op_err_latency_ns = op_err_latency_ns;
 
     BBQ_INFO_LOG("consumer-----> de_ok:%lu", ok_cnt);
     pthread_exit(exit_data);
@@ -373,7 +383,14 @@ void bcm_threads_destory(pthread_t *threads) {
     bbq_free(BBQ_MODULE_BCM, threads);
 }
 
-void bcm_merge_merge_data(bcm_exit_data **exit_data, uint32_t thread_cnt, bcm_merge *merge) {
+void bcm_merge_data_detail(bcm_merge_data *merge, bcm_exit_data *exit_data) {
+    merge->run_times += exit_data->run_times;
+    merge->ok_cnt += exit_data->ok_cnt;
+    merge->latency_ns += exit_data->latency_ns;
+    merge->op_err_latency_ns = exit_data->op_err_latency_ns;
+    merge->op_ok_latency_ns += exit_data->op_ok_latency_ns;
+}
+void bcm_merge_all_data(bcm_exit_data **exit_data, uint32_t thread_cnt, bcm_merge *merge) {
     test_time_metric p_start = {0};
     test_time_metric p_end = {0};
     test_time_metric c_start = {0};
@@ -390,9 +407,7 @@ void bcm_merge_merge_data(bcm_exit_data **exit_data, uint32_t thread_cnt, bcm_me
                 p_end = exit_data[i]->metric_end;
             }
 
-            merge->producer.run_times += exit_data[i]->run_times;
-            merge->producer.ok_cnt += exit_data[i]->ok_cnt;
-            merge->producer.opok_latency_ns += exit_data[i]->opok_latency_ns;
+            bcm_merge_data_detail(&merge->producer, exit_data[i]);
         } else {
             if (test_clock_time_is_zero(&c_start) || test_timespec_is_after(&c_start.timestamp, &exit_data[i]->metric_start.timestamp)) {
                 c_start = exit_data[i]->metric_start;
@@ -402,11 +417,7 @@ void bcm_merge_merge_data(bcm_exit_data **exit_data, uint32_t thread_cnt, bcm_me
                 c_end = exit_data[i]->metric_end;
             }
 
-            merge->consumer.run_times += exit_data[i]->run_times;
-            merge->consumer.ok_cnt += exit_data[i]->ok_cnt;
-            merge->consumer.latency_ns += exit_data[i]->latency_ns;
-
-            merge->consumer.opok_latency_ns += exit_data[i]->opok_latency_ns;
+            bcm_merge_data_detail(&merge->consumer, exit_data[i]);
         }
     }
 
@@ -430,29 +441,43 @@ void bcm_report_printf(test_cfg *cfg, bcm_merge_data *data, test_thread_type_e t
     BBQ_CLOR_PRINT("执行次数 : %lu", data->run_times);
     BBQ_CLOR_PRINT("成功次数 : %lu", data->ok_cnt);
 
-    double throughput = data->ok_cnt / use_time;
-    BBQ_CLOR_PRINT("吞吐 :%.0lf/s (%e/s)", throughput, throughput);
+    // 同时有生产者、消费者时才输出
+    if (cfg->ring.producer_cnt > 0 && cfg->ring.consumer_cnt > 0) {
+        double throughput = data->ok_cnt / use_time;
+        BBQ_CLOR_PRINT("吞吐 :%.0lf/s (%e/s)", throughput, throughput);
 
-    if (ttype == TEST_THREAD_CONSUMER && cfg->ring.workload == TEST_WORKLOAD_COMPLEX) {
-        latency_ns = data->latency_ns * 1.0 / data->ok_cnt;
-        BBQ_CLOR_PRINT("数据延迟 :%.0lf 纳秒 (%e)", latency_ns, latency_ns);
+        if (ttype == TEST_THREAD_CONSUMER && cfg->ring.workload == TEST_WORKLOAD_COMPLEX) {
+            latency_ns = data->latency_ns * 1.0 / data->ok_cnt;
+            BBQ_CLOR_PRINT("数据延迟 :%.0lf 纳秒 (%e)", latency_ns, latency_ns);
+        }
+
+        latency_ns = data->op_ok_latency_ns * 1.0 / data->ok_cnt;
+        BBQ_CLOR_PRINT("操作延迟 :%.0lf 纳秒 (%e)", latency_ns, latency_ns);
     }
 
-    latency_ns = data->opok_latency_ns * 1.0 / data->ok_cnt;
-    BBQ_CLOR_PRINT("操作延迟 :%.0lf 纳秒 (%e)", latency_ns, latency_ns);
+    latency_ns = data->op_err_latency_ns * 1.0 / (data->run_times - data->ok_cnt);
+    if (ttype == TEST_THREAD_PRODUCER) {
+        BBQ_CLOR_PRINT("满队入队操作延迟 :%.0lf 纳秒 (%e)", latency_ns, latency_ns);
+    } else {
+        BBQ_CLOR_PRINT("空队出队操作延迟 :%.0lf 纳秒 (%e)", latency_ns, latency_ns);
+    }
 }
 
 void bcm_report_generate(test_cfg *cfg, bcm_exit_data **exit_data, uint32_t thread_cnt) {
     // test_report report;
 
     bcm_merge merge = {0};
-    bcm_merge_merge_data(exit_data, thread_cnt, &merge);
+    bcm_merge_all_data(exit_data, thread_cnt, &merge);
 
     BBQ_CLOR_PRINT("ring类型:%s", test_ring_type_enum2str(cfg->ring.ring_type));
     BBQ_CLOR_PRINT("简介:%s", cfg->base.introduce);
     BBQ_CLOR_PRINT("配置:%s", cfg->base.name);
-    bcm_report_printf(cfg, &merge.producer, TEST_THREAD_PRODUCER);
-    bcm_report_printf(cfg, &merge.consumer, TEST_THREAD_CONSUMER);
+    if (cfg->ring.producer_cnt > 0) {
+        bcm_report_printf(cfg, &merge.producer, TEST_THREAD_PRODUCER);
+    }
+    if (cfg->ring.consumer_cnt > 0) {
+        bcm_report_printf(cfg, &merge.consumer, TEST_THREAD_CONSUMER);
+    }
 }
 
 #if 1
