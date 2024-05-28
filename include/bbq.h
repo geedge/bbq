@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu@geedgenetworks.com
- * @LastEditTime: 2024-05-28 17:43:52
+ * @LastEditTime: 2024-05-28 20:01:43
  * @Describe:
  */
 
@@ -22,7 +22,7 @@
 // typedef _Atomic uint64_t aotmic_uint64;
 typedef atomic_uint_fast64_t aotmic_uint64;
 typedef aotmic_uint64 bbq_cursor; // 块内的四种游标（version|offset）
-typedef aotmic_uint64 bbq_head;   // 向块的索引（version|idx）
+typedef aotmic_uint64 bbq_head;   // 指向块的索引（version|idx）
 #else
 // C++ 为了兼容gtest测试
 using bbq_cursor = std::atomic<uint64_t>;
@@ -104,5 +104,5 @@ extern bbq_queue_s *bbq_ring_create_bnbs_with_socket(const char *name, size_t bn
 extern void bbq_ring_free(bbq_queue_s *q);
 extern int bbq_enqueue(bbq_queue_s *q, bbq_data data);
 extern int bbq_dequeue(bbq_queue_s *q, bbq_data *deq_data);
-
+extern void bbq_debug_struct_print(bbq_queue_s *q);
 #endif

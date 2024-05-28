@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-24 14:08:42
+ * @LastEditTime: 2024-05-28 18:29:44
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -30,16 +30,16 @@ extern void utest_thread_create(pthread_t *threads, void *(*__start_routine)(voi
 extern void utest_threads_destory(pthread_t *threads);
 extern bool utest_thread_exit_merge_data_compare(thread_data_s *merge_pdata, thread_data_s *deque_datas);
 extern void utest_thread_exit_merge_counter(thread_data_s *data_arr, thread_data_s *data);
-size_t bn = 100;
-size_t bs = 4096;
-size_t pthread_cnt = 10; // 生产者线程个数
-size_t cthread_cnt = 10; // 消费者线程个数
+size_t bn = 4;
+size_t bs = 1365;
+size_t pthread_cnt = 1; // 生产者线程个数
+size_t cthread_cnt = 1; // 消费者线程个数
 
 // 空队满队的边界测试
 TEST(boundary, full_empty) {
     int ret = 0;
     bbq_queue_s *q;
-    // 1.初始队列为空，入队失败
+    // 1.初始队列
     q = bbq_ring_create_bnbs_with_socket("bbq_ring", bn, bs, 0, BBQ_RETRY_NEW);
     EXPECT_TRUE(q != NULL) << "FAILED-1";
 

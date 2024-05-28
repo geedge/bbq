@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-28 18:08:30
+ * @LastEditTime: 2024-05-28 20:04:51
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -526,7 +526,7 @@ void bbq_memory_info() {
             continue;
         }
 
-        BBQ_INFO_LOG("[%d] malloc:%lu free:%lu", i,
+        BBQ_INFO_LOG("[%d]bbq malloc:%lu free:%lu", i,
                      atomic_load(&bbq_memory_g[i].malloc_cnt),
                      atomic_load(&bbq_memory_g[i].free_cnt));
     }
@@ -537,4 +537,29 @@ void bbq_memory_info() {
         BBQ_ERR_LOG("memory not all free");
     }
 #endif
+}
+
+void bbq_debug_struct_print(bbq_queue_s *q) {
+    // printf("%s\n", q->name);
+    // printf("%d\n", q->socket_id);
+    // printf("bs:%ld\n", q->bs);
+    // printf("bn:%ld\n", q->bn);
+    // printf("policy:%d\n", q->policy);
+    // printf("idx_bits:%u\n", q->idx_bits);
+    // printf("off_bits:%u\n", q->off_bits);
+    // printf("off_bits:%u\n", q->off_bits);
+    // printf("idx_mask:%u\n", q->idx_mask);
+    // printf("off_mask:%u\n", q->off_mask);
+
+    printf("phead vsn:%u idx:%u\n", head_vsn(q, q->phead), idx(q, q->phead));
+    printf("chead vsn:%u idx:%u\n", head_vsn(q, q->chead), idx(q, q->chead));
+
+    for (int i = 0; i < q->bn; i++) {
+        printf("[%d]\n", i);
+        printf("  allocated vsn:%u idx:%u\n", cur_vsn(q, q->blocks[i].allocated), off(q, q->blocks[i].allocated));
+        printf("  committed vsn:%u idx:%u\n", cur_vsn(q, q->blocks[i].committed), off(q, q->blocks[i].committed));
+        printf("  reserved vsn:%u idx:%u\n", cur_vsn(q, q->blocks[i].reserved), off(q, q->blocks[i].reserved));
+        printf("  consumed vsn:%u idx:%u\n", cur_vsn(q, q->blocks[i].consumed), off(q, q->blocks[i].consumed));
+        printf("\n");
+    }
 }

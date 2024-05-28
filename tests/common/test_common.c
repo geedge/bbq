@@ -1,7 +1,7 @@
 /*
  * @Description: 描述信息
  * @Date: 2024-05-25 10:55:48
- * @LastEditTime: 2024-05-28 17:22:01
+ * @LastEditTime: 2024-05-28 19:52:35
  */
 
 #include "test_common.h"
@@ -54,7 +54,7 @@ void test_memory_info() {
             continue;
         }
 
-        BBQ_INFO_LOG("[%d] malloc:%lu free:%lu", i,
+        BBQ_INFO_LOG("[%d]test malloc:%lu free:%lu", i,
                      atomic_load(&test_memory_g[i].malloc_cnt),
                      atomic_load(&test_memory_g[i].free_cnt));
     }

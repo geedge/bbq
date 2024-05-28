@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-28 17:09:36
+ * @LastEditTime: 2024-05-28 20:30:41
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -227,6 +227,8 @@ void *bcm_thread_consumer_start(void *arg) {
 
     bcm_wait_all_threads_ready(cfg);
 
+    usleep(100);
+
     exit_data->metric_start = test_clock_time_get();
     while (true) {
         if (cfg->run.dequeue_cnt > 0 && run_times >= cfg->run.dequeue_cnt) {
@@ -267,6 +269,7 @@ void *bcm_thread_consumer_start(void *arg) {
             ok_cnt++;
             op_ok_latency_ns += test_clock_time_to_ns(&op_latency);
         } else {
+            printf("zzzzz ret=%d\n", ret);
             op_err_latency_ns += test_clock_time_to_ns(&op_latency);
         }
 
@@ -492,7 +495,7 @@ void bcm_report_generate(test_cfg *cfg, bcm_exit_data **exit_data, uint32_t thre
     }
 }
 
-#if 1
+#if 0
 int main(int argc, char *argv[]) {
     char *config;
     char *ring_type;
@@ -566,24 +569,31 @@ int main(int argc, char *argv[]) {
 }
 #else
 
+int bn = 3;
+int bs = 5;
+int test_cnt = 15;
+int loop_cnt = 2;
+
 void *pstart(void *arg) {
     bbq_queue_s *q = (bbq_queue_s *)arg;
 
     int ret = 0;
     uint32_t ok_cnt = 0;
 
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < test_cnt; i++) {
         int *data = (int *)malloc(sizeof(int));
         *data = 123;
-        if (bbq_enqueue(q, data) == 0) {
+        ret = bbq_enqueue(q, data);
+        if (ret == 0) {
             ok_cnt++;
-            printf("enqueue ok:%p\n", data);
         } else {
+            printf("enqueue err:%p ret:%d\n", data, ret);
             free(data);
         }
     }
 
-    printf("p ok_cnt:%u\n", ok_cnt);
+    bbq_debug_struct_print(q);
+    printf("------------------------------p ok_cnt:%u\n", ok_cnt);
 }
 
 void *cstart(void *arg) {
@@ -592,26 +602,27 @@ void *cstart(void *arg) {
     int ret = 0;
     uint32_t ok_cnt = 0;
 
-    for (int i = 0; i < 1; i++) {
+    for (int i = 0; i < test_cnt; i++) {
         ret = bbq_dequeue(q, (void **)&data);
         if (ret == 0) {
             if (*data != 123) {
                 printf(".........!!!!!!!!  *data !=123,  is :%d\n", *data);
+                exit(-1);
             }
-            printf("try free %p\n", data);
             free(data);
             ok_cnt++;
         } else {
-            // printf("dequeue err ret:%d\n", ret);
+            printf("dequeue err ret:%d\n", ret);
         }
     }
 
-    printf("c ok_cnt:%u\n", ok_cnt);
+    bbq_debug_struct_print(q);
+    printf("------------------------------c ok_cnt:%u\n", ok_cnt);
 }
 
 int main() {
 #define TCNT 10
-    bbq_queue_s *q = bbq_ring_create_bnbs_with_socket("bbq_ring", 5, 1, 0, BBQ_RETRY_NEW);
+    bbq_queue_s *q = bbq_ring_create_bnbs_with_socket("bbq_ring", bn, bs, -1, BBQ_RETRY_NEW);
     if (q == NULL) {
         BBQ_ERR_LOG("bbq_ring_create_with_socket failed");
         return BBQ_NULL_PTR;
@@ -631,14 +642,13 @@ int main() {
         pthread_join(thread_arr[i], NULL);  // 等待每个线程结束
     }
 #else
-    pstart(q);
-    cstart(q);
-    pstart(q);
+
+    for (int i = 0; i < loop_cnt; i++) {
+        pstart(q);
+        cstart(q);
+    }
 #endif
-
-    printf("test,333,,\n");
     bbq_ring_free(q);
-
     printf("end...\n");
 }
 #endif
