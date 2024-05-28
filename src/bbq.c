@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-28 17:43:22
+ * @LastEditTime: 2024-05-28 18:08:30
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -467,6 +467,7 @@ void *bbq_malloc(bbq_module_e module, int socket_id, size_t size) {
         atomic_fetch_add(&bbq_memory_g[module].malloc_size, size);
     }
 #endif
+
     return ptr;
 }
 
@@ -479,9 +480,9 @@ void bbq_free(bbq_module_e module, int socket_id, void *ptr, size_t size) {
 #endif
     // free(ptr);
     if (socket_id >= 0) {
-        free(ptr);
-    } else {
         numa_free(ptr, size);
+    } else {
+        free(ptr);
     }
 }
 
