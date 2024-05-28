@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-28 15:27:03
+ * @LastEditTime: 2024-05-28 15:55:36
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -425,9 +425,10 @@ void bcm_merge_all_data(bcm_exit_data **exit_data, uint32_t thread_cnt, bcm_merg
     merge->consumer.use_time = test_clock_time_sub(c_end, c_start);
 }
 
-void bcm_report_printf(test_cfg *cfg, bcm_merge_data *data, test_thread_type_e ttype) {
+void bcm_report_printf(test_cfg *cfg, bcm_merge_data *data, bcm_exit_data **raw_data, uint32_t thread_cnt, test_thread_type_e ttype) {
     char name[10] = {0};
     double latency_ns = 0;
+    double throughput = 0;
 
     if (ttype == TEST_THREAD_PRODUCER) {
         strcpy(name, "生产者");
@@ -435,7 +436,7 @@ void bcm_report_printf(test_cfg *cfg, bcm_merge_data *data, test_thread_type_e t
         strcpy(name, "消费者");
     }
 
-    BBQ_CLOR_PRINT("---------%s---------", name);
+    BBQ_CLOR_PRINT("\n---------%s---------", name);
     double use_time = test_clock_time_to_double(&data->use_time);
     BBQ_CLOR_PRINT("执行时间 : %lf 秒", use_time);
     BBQ_CLOR_PRINT("执行次数 : %lu", data->run_times);
@@ -443,8 +444,21 @@ void bcm_report_printf(test_cfg *cfg, bcm_merge_data *data, test_thread_type_e t
 
     // 同时有生产者、消费者时才输出
     if (cfg->ring.producer_cnt > 0 && cfg->ring.consumer_cnt > 0) {
-        double throughput = data->ok_cnt / use_time;
+        throughput = data->ok_cnt / use_time;
         BBQ_CLOR_PRINT("吞吐 :%.0lf/s (%e/s)", throughput, throughput);
+
+        // 多生产者单消费者 或 单生产者多消费才输出
+        if ((cfg->ring.producer_cnt == 1 && cfg->ring.consumer_cnt > 1) ||
+            (cfg->ring.producer_cnt > 1 && cfg->ring.consumer_cnt == 1)) {
+            for (uint32_t i = 0, idx = 1; i < thread_cnt; i++) {
+                if (raw_data[i]->arg->ttype == ttype) {
+                    test_time_metric tmp_time = test_clock_time_sub(raw_data[i]->metric_end, raw_data[i]->metric_start);
+                    throughput = raw_data[i]->ok_cnt / test_clock_time_to_double(&tmp_time);
+                    BBQ_CLOR_PRINT("    %s-%d 吞吐 :%.0lf/s (%e/s)", name, idx, throughput, throughput);
+                    idx++;
+                }
+            }
+        }
 
         if (ttype == TEST_THREAD_CONSUMER && cfg->ring.workload == TEST_WORKLOAD_COMPLEX) {
             latency_ns = data->latency_ns * 1.0 / data->ok_cnt;
@@ -453,13 +467,13 @@ void bcm_report_printf(test_cfg *cfg, bcm_merge_data *data, test_thread_type_e t
 
         latency_ns = data->op_ok_latency_ns * 1.0 / data->ok_cnt;
         BBQ_CLOR_PRINT("操作延迟 :%.0lf 纳秒 (%e)", latency_ns, latency_ns);
-    }
-
-    latency_ns = data->op_err_latency_ns * 1.0 / (data->run_times - data->ok_cnt);
-    if (ttype == TEST_THREAD_PRODUCER) {
-        BBQ_CLOR_PRINT("满队入队操作延迟 :%.0lf 纳秒 (%e)", latency_ns, latency_ns);
     } else {
-        BBQ_CLOR_PRINT("空队出队操作延迟 :%.0lf 纳秒 (%e)", latency_ns, latency_ns);
+        latency_ns = data->op_err_latency_ns * 1.0 / (data->run_times - data->ok_cnt);
+        if (ttype == TEST_THREAD_PRODUCER) {
+            BBQ_CLOR_PRINT("满队入队操作延迟 :%.0lf 纳秒 (%e)", latency_ns, latency_ns);
+        } else {
+            BBQ_CLOR_PRINT("空队出队操作延迟 :%.0lf 纳秒 (%e)", latency_ns, latency_ns);
+        }
     }
 }
 
@@ -473,10 +487,10 @@ void bcm_report_generate(test_cfg *cfg, bcm_exit_data **exit_data, uint32_t thre
     BBQ_CLOR_PRINT("简介:%s", cfg->base.introduce);
     BBQ_CLOR_PRINT("配置:%s", cfg->base.name);
     if (cfg->ring.producer_cnt > 0) {
-        bcm_report_printf(cfg, &merge.producer, TEST_THREAD_PRODUCER);
+        bcm_report_printf(cfg, &merge.producer, exit_data, thread_cnt, TEST_THREAD_PRODUCER);
     }
     if (cfg->ring.consumer_cnt > 0) {
-        bcm_report_printf(cfg, &merge.consumer, TEST_THREAD_CONSUMER);
+        bcm_report_printf(cfg, &merge.consumer, exit_data, thread_cnt, TEST_THREAD_CONSUMER);
     }
 }
 
