@@ -69,8 +69,8 @@ test_time_metric test_clock_time_get() {
     test_time_metric metric = {0};
     struct timespec timestamp;
 
-    clock_gettime(CLOCK_MONOTONIC, &metric.timestamp);
-
+    // clock_gettime(CLOCK_MONOTONIC, &metric.timestamp); //从系统启动这一刻起开始计时,不受系统时间被用户改变的影响
+    clock_gettime(CLOCK_REALTIME, &metric.timestamp); // 系统实时时间,随系统实时时间改变而改变
     return metric;
 }
 

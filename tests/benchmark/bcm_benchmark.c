@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-27 19:11:29
+ * @LastEditTime: 2024-05-28 10:14:28
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -202,15 +202,24 @@ void *bcm_thread_consumer_start(void *arg) {
         bcm_data *data = NULL;
         ret = t_arg->q->dequeue_f(t_arg->q->ring, (void **)(&data));
         if (ret == 0) {
-            test_time_metric latency = test_clock_time_sub(test_clock_time_get(), data->enqueue_time);
-            latency_ns += latency.timestamp.tv_sec * 1000 * 1000 * 1000 + latency.timestamp.tv_nsec;
+            if (t_arg->cfg->ring.workload == TEST_WORKLOAD_SIMPLE) {
+                if (data->data != BCM_SIMPLE_DATA_MAGIC) {
+                    BBQ_ERR_LOG("the obtained data is not consistent with the expectation, expect:%u actual:%u", BCM_SIMPLE_DATA_MAGIC, *data);
+                    exit(-1);
+                }
+            } else {
+                test_time_metric latency = test_clock_time_sub(test_clock_time_get(), data->enqueue_time);
+                if (test_clock_time_is_zero(&data->enqueue_time)) {
+                    BBQ_ERR_LOG("enqueue_time is 0");
+                    exit(-1);
+                }
 
-            if (data->data != BCM_SIMPLE_DATA_MAGIC) {
-                BBQ_ERR_LOG("the obtained data is not consistent with the expectation, expect:%u actual:%u", BCM_SIMPLE_DATA_MAGIC, *data);
-                exit(-1);
-            }
+                if (data->data != BCM_SIMPLE_DATA_MAGIC) {
+                    BBQ_ERR_LOG("the obtained data is not consistent with the expectation, expect:%u actual:%u", BCM_SIMPLE_DATA_MAGIC, *data);
+                    exit(-1);
+                }
 
-            if (t_arg->cfg->ring.workload == TEST_WORKLOAD_COMPLEX) {
+                latency_ns += latency.timestamp.tv_sec * 1000 * 1000 * 1000 + latency.timestamp.tv_nsec;
                 if (exit_data->complex_data.data != NULL) {
                     exit_data->complex_data.data[exit_data->complex_data.data_cnt] = *data;
                 }
@@ -218,6 +227,7 @@ void *bcm_thread_consumer_start(void *arg) {
                 bbq_free(BBQ_MODULE_BCM_EXIT_DATA, data);
                 bcmbusy_loopof();
             }
+
             ok_cnt++;
         }
 
@@ -368,7 +378,7 @@ void bcm_merge_merge_data(bcm_exit_data **exit_data, uint32_t thread_cnt, bcm_me
     merge->consumer.use_time = test_clock_time_sub(c_end, c_start);
 }
 
-void bcm_report_printf(bcm_merge_data *data, test_thread_type_e ttype) {
+void bcm_report_printf(test_cfg *cfg, bcm_merge_data *data, test_thread_type_e ttype) {
     char name[10] = {0};
 
     if (ttype == TEST_THREAD_PRODUCER) {
@@ -383,9 +393,12 @@ void bcm_report_printf(bcm_merge_data *data, test_thread_type_e ttype) {
     BBQ_CLOR_PRINT("执行时间 : %lf 秒", use_time);
     BBQ_CLOR_PRINT("执行次数 : %lu", data->run_times);
     BBQ_CLOR_PRINT("成功次数 : %lu", data->ok_cnt);
-    BBQ_CLOR_PRINT("吞吐 :%.0lf/s", data->ok_cnt / use_time);
-    if (ttype == TEST_THREAD_CONSUMER) {
-        BBQ_CLOR_PRINT("数据延迟 :%.0lf 纳秒", data->latency_ns / data->ok_cnt);
+
+    double throughput = data->ok_cnt / use_time;
+    BBQ_CLOR_PRINT("吞吐 :%.0lf/s (%e/s)", throughput, throughput);
+    if (ttype == TEST_THREAD_CONSUMER && cfg->ring.workload == TEST_WORKLOAD_COMPLEX) {
+        double latency_ns = data->latency_ns * 1.0 / data->ok_cnt;
+        BBQ_CLOR_PRINT("数据延迟 :%.0lf 纳秒 (%e)", latency_ns, latency_ns);
     }
 }
 
@@ -398,8 +411,8 @@ void bcm_report_generate(test_cfg *cfg, bcm_exit_data **exit_data, uint32_t thre
     BBQ_CLOR_PRINT("ring类型:%s", test_ring_type_enum2str(cfg->ring.ring_type));
     BBQ_CLOR_PRINT("简介:%s", cfg->base.introduce);
     BBQ_CLOR_PRINT("配置:%s", cfg->base.name);
-    bcm_report_printf(&merge.producer, TEST_THREAD_PRODUCER);
-    bcm_report_printf(&merge.consumer, TEST_THREAD_CONSUMER);
+    bcm_report_printf(cfg, &merge.producer, TEST_THREAD_PRODUCER);
+    bcm_report_printf(cfg, &merge.consumer, TEST_THREAD_CONSUMER);
 }
 
 #if 1
@@ -411,7 +424,7 @@ int main(int argc, char *argv[]) {
         config = argv[1];
         ring_type = argv[2];
     } else {
-        config = "/root/code/c/bbq-ly/tests/benchmark/config/case1_simple_spsc.ini";
+        config = "/root/code/c/bbq-ly/tests/benchmark/config/bbq_debug/debug.ini";
         ring_type = "bbq";
         BBQ_ERR_LOG("use default config, ringt_type:bbq config:%s", config);
     }
