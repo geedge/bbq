@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-27 15:20:10
+ * @LastEditTime: 2024-05-28 14:09:37
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -81,4 +81,6 @@ extern test_ring_type test_ring_type_str2enum(const char *ring_type);
 extern bool test_clock_time_is_zero(test_time_metric *metric);
 extern bool test_timespec_is_after(const struct timespec *a, const struct timespec *b);
 extern char *test_ring_type_enum2str(test_ring_type ring_type);
+extern uint64_t test_clock_time_to_ns(test_time_metric *metric);
+extern uint64_t test_clock_time_to_double(test_time_metric *metric);
 #endif

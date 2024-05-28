@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-28 10:14:28
+ * @LastEditTime: 2024-05-28 14:50:31
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -40,14 +40,16 @@ typedef struct {
     test_time_metric metric_end;
     uint64_t run_times;
     uint64_t ok_cnt;
-    uint64_t latency_ns; // 消费者有效
+    uint64_t latency_ns;      // 仅消费者有效，数据停留的时延
+    uint64_t opok_latency_ns; // 成功操作的时延
 } bcm_exit_data;
 
 typedef struct {
     test_time_metric use_time;
     uint64_t run_times;
     uint64_t ok_cnt;
-    uint64_t latency_ns; // 消费者有效
+    uint64_t latency_ns;      // 仅消费者有效，数据停留的时延
+    uint64_t opok_latency_ns; // 成功操作的时延
 } bcm_merge_data;
 
 typedef struct {
@@ -113,6 +115,26 @@ bcm_exit_data *bcm_exit_data_destory(bcm_exit_data *data) {
     bbq_free(BBQ_MODULE_BCM, data);
 }
 
+int bcm_exec_enqueue(bcm_queue_t *q, void *obj, test_time_metric *op_use_diff) {
+    int ret = 0;
+
+    test_time_metric op_use_start = test_clock_time_get();
+    ret = q->enqueue_f(q->ring, obj);
+    *op_use_diff = test_clock_time_sub(test_clock_time_get(), op_use_start);
+
+    return ret;
+}
+
+int bcm_exec_dequeue(bcm_queue_t *q, void **obj, test_time_metric *op_use_diff) {
+    int ret = 0;
+
+    test_time_metric op_use_start = test_clock_time_get();
+    ret = q->dequeue_f(q->ring, obj);
+    *op_use_diff = test_clock_time_sub(test_clock_time_get(), op_use_start);
+
+    return ret;
+}
+
 void *bcm_thread_producer_start(void *arg) {
     int ret = 0;
     uint64_t ok_cnt = 0;
@@ -122,6 +144,9 @@ void *bcm_thread_producer_start(void *arg) {
     bcm_queue_t *q = t_arg->q;
     bcm_exit_data *exit_data = bcm_exit_data_create(t_arg);
     char thread_name[128] = {0};
+    uint64_t opok_latency_ns = 0;
+
+    test_time_metric op_latency = {0};
 
     snprintf(thread_name, sizeof(thread_name), "producer:%x", exit_data->thread_id);
     prctl(PR_SET_NAME, thread_name);
@@ -140,7 +165,7 @@ void *bcm_thread_producer_start(void *arg) {
             break;
         }
         if (cfg->ring.workload == TEST_WORKLOAD_SIMPLE) {
-            ret = q->enqueue_f(q->ring, &(exit_data->simple_data));
+            ret = bcm_exec_enqueue(q, &(exit_data->simple_data), &op_latency);
         } else {
             bcm_data *data = bbq_malloc(BBQ_MODULE_BCM_EXIT_DATA, sizeof(bcm_data));
             if (data == NULL) {
@@ -152,7 +177,7 @@ void *bcm_thread_producer_start(void *arg) {
             if (exit_data->complex_data.data != NULL) {
                 exit_data->complex_data.data[exit_data->complex_data.data_cnt] = *data;
             }
-            ret = q->enqueue_f(q->ring, data);
+            ret = bcm_exec_enqueue(q, data, &op_latency);
             if (ret == 0) {
                 exit_data->complex_data.data_cnt++;
             } else {
@@ -163,6 +188,7 @@ void *bcm_thread_producer_start(void *arg) {
 
         if (ret == 0) {
             ok_cnt++;
+            opok_latency_ns += test_clock_time_to_ns(&op_latency);
         }
 
         run_times++;
@@ -171,6 +197,8 @@ void *bcm_thread_producer_start(void *arg) {
     exit_data->metric_end = test_clock_time_get();
     exit_data->run_times = run_times;
     exit_data->ok_cnt = ok_cnt;
+
+    exit_data->opok_latency_ns = opok_latency_ns;
 
     BBQ_INFO_LOG("producer-----> en_ok:%lu", ok_cnt);
     pthread_exit(exit_data);
@@ -185,6 +213,8 @@ void *bcm_thread_consumer_start(void *arg) {
     bcm_queue_t *q = t_arg->q;
     bcm_exit_data *exit_data = bcm_exit_data_create(t_arg);
     uint64_t latency_ns = 0;
+    test_time_metric op_latency = {0};
+    uint64_t opok_latency_ns;
 
     char thread_name[128] = {0};
     snprintf(thread_name, sizeof(thread_name), "consumer:%x", exit_data->thread_id);
@@ -200,7 +230,8 @@ void *bcm_thread_consumer_start(void *arg) {
         }
 
         bcm_data *data = NULL;
-        ret = t_arg->q->dequeue_f(t_arg->q->ring, (void **)(&data));
+
+        ret = bcm_exec_dequeue(q, (void **)(&data), &op_latency);
         if (ret == 0) {
             if (t_arg->cfg->ring.workload == TEST_WORKLOAD_SIMPLE) {
                 if (data->data != BCM_SIMPLE_DATA_MAGIC) {
@@ -219,7 +250,7 @@ void *bcm_thread_consumer_start(void *arg) {
                     exit(-1);
                 }
 
-                latency_ns += latency.timestamp.tv_sec * 1000 * 1000 * 1000 + latency.timestamp.tv_nsec;
+                latency_ns += test_clock_time_to_ns(&latency);
                 if (exit_data->complex_data.data != NULL) {
                     exit_data->complex_data.data[exit_data->complex_data.data_cnt] = *data;
                 }
@@ -229,6 +260,7 @@ void *bcm_thread_consumer_start(void *arg) {
             }
 
             ok_cnt++;
+            opok_latency_ns += test_clock_time_to_ns(&op_latency);
         }
 
         run_times++;
@@ -243,6 +275,7 @@ void *bcm_thread_consumer_start(void *arg) {
     exit_data->run_times = run_times;
     exit_data->ok_cnt = ok_cnt;
     exit_data->latency_ns = latency_ns;
+    exit_data->opok_latency_ns = opok_latency_ns;
 
     BBQ_INFO_LOG("consumer-----> de_ok:%lu", ok_cnt);
     pthread_exit(exit_data);
@@ -359,6 +392,7 @@ void bcm_merge_merge_data(bcm_exit_data **exit_data, uint32_t thread_cnt, bcm_me
 
             merge->producer.run_times += exit_data[i]->run_times;
             merge->producer.ok_cnt += exit_data[i]->ok_cnt;
+            merge->producer.opok_latency_ns += exit_data[i]->opok_latency_ns;
         } else {
             if (test_clock_time_is_zero(&c_start) || test_timespec_is_after(&c_start.timestamp, &exit_data[i]->metric_start.timestamp)) {
                 c_start = exit_data[i]->metric_start;
@@ -371,6 +405,8 @@ void bcm_merge_merge_data(bcm_exit_data **exit_data, uint32_t thread_cnt, bcm_me
             merge->consumer.run_times += exit_data[i]->run_times;
             merge->consumer.ok_cnt += exit_data[i]->ok_cnt;
             merge->consumer.latency_ns += exit_data[i]->latency_ns;
+
+            merge->consumer.opok_latency_ns += exit_data[i]->opok_latency_ns;
         }
     }
 
@@ -380,6 +416,7 @@ void bcm_merge_merge_data(bcm_exit_data **exit_data, uint32_t thread_cnt, bcm_me
 
 void bcm_report_printf(test_cfg *cfg, bcm_merge_data *data, test_thread_type_e ttype) {
     char name[10] = {0};
+    double latency_ns = 0;
 
     if (ttype == TEST_THREAD_PRODUCER) {
         strcpy(name, "生产者");
@@ -388,18 +425,21 @@ void bcm_report_printf(test_cfg *cfg, bcm_merge_data *data, test_thread_type_e t
     }
 
     BBQ_CLOR_PRINT("---------%s---------", name);
-    double use_time = data->use_time.timestamp.tv_sec +
-                      data->use_time.timestamp.tv_nsec * 1.0 / 1000 / 1000 / 1000;
+    double use_time = test_clock_time_to_double(&data->use_time);
     BBQ_CLOR_PRINT("执行时间 : %lf 秒", use_time);
     BBQ_CLOR_PRINT("执行次数 : %lu", data->run_times);
     BBQ_CLOR_PRINT("成功次数 : %lu", data->ok_cnt);
 
     double throughput = data->ok_cnt / use_time;
     BBQ_CLOR_PRINT("吞吐 :%.0lf/s (%e/s)", throughput, throughput);
+
     if (ttype == TEST_THREAD_CONSUMER && cfg->ring.workload == TEST_WORKLOAD_COMPLEX) {
-        double latency_ns = data->latency_ns * 1.0 / data->ok_cnt;
+        latency_ns = data->latency_ns * 1.0 / data->ok_cnt;
         BBQ_CLOR_PRINT("数据延迟 :%.0lf 纳秒 (%e)", latency_ns, latency_ns);
     }
+
+    latency_ns = data->opok_latency_ns * 1.0 / data->ok_cnt;
+    BBQ_CLOR_PRINT("操作延迟 :%.0lf 纳秒 (%e)", latency_ns, latency_ns);
 }
 
 void bcm_report_generate(test_cfg *cfg, bcm_exit_data **exit_data, uint32_t thread_cnt) {

@@ -1,7 +1,7 @@
 /*
  * @Description: 描述信息
  * @Date: 2024-05-25 10:55:48
- * @LastEditTime: 2024-05-27 15:20:59
+ * @LastEditTime: 2024-05-28 14:07:09
  */
 
 #include "test_common.h"
@@ -72,6 +72,15 @@ test_time_metric test_clock_time_get() {
     // clock_gettime(CLOCK_MONOTONIC, &metric.timestamp); //从系统启动这一刻起开始计时,不受系统时间被用户改变的影响
     clock_gettime(CLOCK_REALTIME, &metric.timestamp); // 系统实时时间,随系统实时时间改变而改变
     return metric;
+}
+
+uint64_t test_clock_time_to_ns(test_time_metric *metric) {
+    return metric->timestamp.tv_nsec + metric->timestamp.tv_sec * 1000 * 1000 * 1000;
+}
+
+uint64_t test_clock_time_to_double(test_time_metric *metric) {
+    return metric->timestamp.tv_sec +
+           metric->timestamp.tv_nsec * 1.0 / 1000 / 1000 / 1000;
 }
 
 bool test_clock_time_is_zero(test_time_metric *metric) {
