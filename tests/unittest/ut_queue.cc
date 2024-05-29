@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-29 18:07:58
+ * @LastEditTime: 2024-05-29 19:12:06
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -9,12 +9,10 @@
 #include <limits.h>
 
 extern "C" {
-#include "bbq.h"
+#include "ut.h"
 extern int bbq_malloc_free_equal();
 extern void bbq_memory_info();
 }
-
-#include "ut.h"
 
 namespace {
 extern void *utest_producer_thread(void *arg);
@@ -30,8 +28,9 @@ extern void utest_thread_create(pthread_t *threads, void *(*__start_routine)(voi
 extern void utest_threads_destory(pthread_t *threads);
 extern bool utest_thread_exit_merge_data_compare(thread_data_s *merge_pdata, thread_data_s *deque_datas);
 extern void utest_thread_exit_merge_counter(thread_data_s *data_arr, thread_data_s *data);
+
 size_t bn = 4;
-size_t bs = 1365;
+size_t bs = 4096;
 size_t pthread_cnt = 1; // 生产者线程个数
 size_t cthread_cnt = 1; // 消费者线程个数
 
