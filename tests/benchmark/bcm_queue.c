@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-29 09:51:11
+ * @LastEditTime: 2024-05-29 16:22:41
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -17,6 +17,19 @@ int bcm_queue_init_dpdk(test_cfg *cfg, bcm_queue_t *q) {
     }
 
     q->ring_type = TEST_RING_TYPE_DPDK;
+    unsigned int flags = 0;
+    if (cfg->ring.producer_cnt <= 1) {
+        flags |= RING_F_SP_ENQ;
+    } else {
+        flags |= RING_F_MP_RTS_ENQ;
+    }
+
+    if (cfg->ring.consumer_cnt <= 1) {
+        flags |= RING_F_SC_DEQ;
+    } else {
+        flags |= RING_F_MC_RTS_DEQ;
+    }
+
     q->ring = (void *)rte_ring_create("dpdk_ring", cfg->ring.entries_cnt, rte_socket_id(), RING_F_MP_RTS_ENQ | RING_F_MC_RTS_DEQ);
     if (q->dpdk_ring == NULL) {
         return BBQ_NULL_PTR;

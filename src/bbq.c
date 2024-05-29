@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-29 10:17:19
+ * @LastEditTime: 2024-05-29 18:46:50
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -10,23 +10,23 @@
 #include <stdio.h>
 #include <string.h>
 
-static bbq_queue_state_s allocate_entry(bbq_queue_s *q, bbq_block_s *block);
-static void commit_entry(bbq_entry_desc_s *e, bbq_data data);
-static bbq_queue_state_s advance_phead(bbq_queue_s *q, uint64_t ph);
-static bbq_queue_state_s reserve_entry(bbq_queue_s *q, bbq_block_s *block);
-static bbq_data consume_entry(bbq_queue_s *q, bbq_entry_desc_s *e);
-static bool advance_chead(bbq_queue_s *q, uint64_t ch, uint64_t ver);
-static inline uint64_t idx(bbq_queue_s *q, uint64_t x);
-static inline uint64_t off(bbq_queue_s *q, uint64_t x);
-static inline uint64_t head_vsn(bbq_queue_s *q, uint64_t x);
-static inline uint64_t cur_vsn(bbq_queue_s *q, uint64_t x);
-static inline uint64_t set_cur_vsn(bbq_queue_s *q, uint64_t ver);
-static inline uint64_t fetch_max(aotmic_uint64 *atom, uint64_t upd);
-static void *bbq_memset(void *data, size_t size);
+extern bbq_queue_state_s allocate_entry(bbq_queue_s *q, bbq_block_s *block);
+extern void commit_entry(bbq_entry_desc_s *e, bbq_data data);
+extern bbq_queue_state_s advance_phead(bbq_queue_s *q, uint64_t ph);
+extern bbq_queue_state_s reserve_entry(bbq_queue_s *q, bbq_block_s *block);
+extern bbq_data consume_entry(bbq_queue_s *q, bbq_entry_desc_s *e);
+extern bool advance_chead(bbq_queue_s *q, uint64_t ch, uint64_t ver);
+extern inline uint64_t idx(bbq_queue_s *q, uint64_t x);
+extern inline uint64_t off(bbq_queue_s *q, uint64_t x);
+extern inline uint64_t head_vsn(bbq_queue_s *q, uint64_t x);
+extern inline uint64_t cur_vsn(bbq_queue_s *q, uint64_t x);
+extern inline uint64_t set_cur_vsn(bbq_queue_s *q, uint64_t ver);
+extern inline uint64_t fetch_max(aotmic_uint64 *atom, uint64_t upd);
+extern void *bbq_memset(void *data, size_t size);
 extern void *bbq_malloc(bbq_module_e module, int socket_id, size_t size);
 extern void bbq_free(bbq_module_e module, int socket_id, void *ptr, size_t size);
 
-bool bbq_is_power_of_two(int n) {
+bool bbq_is_power_of_two(uint32_t n) {
     // 负数和0都不是2的N次方
     if (n <= 0) {
         return false;
@@ -35,8 +35,8 @@ bool bbq_is_power_of_two(int n) {
     return (n & (n - 1)) == 0;
 }
 
-// 根据entries大小返回合理的blocks配置TODO:
-static uint32_t bbq_blocks_calc(uint32_t entries) {
+// 根据entries大小返回合理的blocks配置
+uint32_t bbq_blocks_calc(uint32_t entries) {
     double log_entries = log2((double)entries);   // 计算log2(entries)
     uint32_t over4 = (uint32_t)(log_entries / 4); // 向下取整
     uint32_t max_value = (over4 > 1) ? over4 : 1; // 取1和log_y_over_4中的较大值
@@ -44,7 +44,7 @@ static uint32_t bbq_blocks_calc(uint32_t entries) {
     return n;
 }
 
-static int block_init(bbq_block_s *block, size_t bs, bool cursor_init, int socket_id) {
+int block_init(bbq_block_s *block, uint32_t bs, bool cursor_init, int socket_id) {
     block->entries = bbq_malloc(BBQ_MODULE_QUEUE_BLOCK_ENTRY, socket_id, sizeof(bbq_data) * bs);
     if (block->entries == NULL) {
         BBQ_ERR_LOG("bbq_malloc error");
@@ -66,7 +66,7 @@ static int block_init(bbq_block_s *block, size_t bs, bool cursor_init, int socke
     return BBQ_OK;
 }
 
-static void block_cleanup(bbq_block_s *block, size_t bs, int socket_id) {
+void block_cleanup(bbq_block_s *block, uint32_t bs, int socket_id) {
     bbq_free(BBQ_MODULE_QUEUE_BLOCK_ENTRY, socket_id, block->entries, sizeof(bbq_data) * bs);
     block->entries = NULL;
 }
@@ -76,22 +76,22 @@ static void block_cleanup(bbq_block_s *block, size_t bs, int socket_id) {
 // 例如：x=1，return 0 (...1)
 // x=3，return 1  （..11）
 // x=9，return 3  （1..1）
-static unsigned floor_log2(uint64_t x) {
+unsigned floor_log2(uint64_t x) {
     return x == 1 ? 0 : 1 + floor_log2(x >> 1);
 }
 
 // 返回以2为底的对数并向上取整值。
 // 例如：x=1，return 0 （2^0=1）
 // x=99， return 7（2^6=64  2^7=128）
-static unsigned ceil_log2(uint64_t x) {
+unsigned ceil_log2(uint64_t x) {
     return x == 1 ? 0 : floor_log2(x - 1) + 1;
 }
 
-bbq_queue_s *bbq_ring_create_bnbs(const char *name, size_t bn, size_t bs, bbq_policy_e policy) {
-    return bbq_ring_create_bnbs_with_socket(name, bn, bs, -1, policy);
+bbq_queue_s *bbq_ring_create_bnbs(const char *name, uint32_t bn, uint32_t bs, bbq_policy_e policy) {
+    return bbq_ring_create_bnbs_with_socket(name, bn, bs, BBQ_INVALID_SOCKET, policy);
 }
 
-bbq_queue_s *bbq_ring_create_bnbs_with_socket(const char *name, size_t bn, size_t bs, int socket_id, bbq_policy_e policy) {
+bbq_queue_s *bbq_ring_create_bnbs_with_socket(const char *name, uint32_t bn, uint32_t bs, int socket_id, bbq_policy_e policy) {
     int ret = 0;
     bool numa_enable = true;
 
@@ -106,7 +106,8 @@ bbq_queue_s *bbq_ring_create_bnbs_with_socket(const char *name, size_t bn, size_
     }
 
     if (numa_available() < 0) {
-        socket_id = -1;
+        // 不支持numa，设置
+        socket_id = BBQ_INVALID_SOCKET;
     }
 
     bbq_queue_s *q = bbq_malloc(BBQ_MODULE_QUEUE, socket_id, sizeof(bbq_queue_s));
@@ -133,7 +134,7 @@ bbq_queue_s *bbq_ring_create_bnbs_with_socket(const char *name, size_t bn, size_
         goto error;
     }
 
-    for (size_t i = 0; i < bn; ++i) {
+    for (uint32_t i = 0; i < bn; ++i) {
         // 第一个block不需要设置cursor_init_flag
         bool cursor_init_flag = (i == 0 ? false : true);
         ret = block_init(&(q->blocks[i]), bs, cursor_init_flag, socket_id);
@@ -154,7 +155,7 @@ bbq_queue_s *bbq_ring_create_bnbs_with_socket(const char *name, size_t bn, size_
 error:
     if (q != NULL) {
         if (q->blocks) {
-            for (size_t i = 0; i < bn; ++i) {
+            for (uint32_t i = 0; i < bn; ++i) {
                 bbq_free(BBQ_MODULE_QUEUE_BLOCK_ENTRY, q->socket_id, q->blocks->entries, sizeof(bbq_data) * bs);
             }
             bbq_free(BBQ_MODULE_QUEUE_BLOCK_NB, q->socket_id, q->blocks, bn * sizeof(bbq_block_s));
@@ -166,7 +167,7 @@ error:
 
 bbq_queue_s *bbq_ring_create(const char *name, uint32_t count, bbq_policy_e policy) {
     // 传入无效socket_id，将使用malloc分配内存
-    return bbq_ring_create_with_socket(name, count, -1, policy);
+    return bbq_ring_create_with_socket(name, count, BBQ_INVALID_SOCKET, policy);
 }
 
 bbq_queue_s *bbq_ring_create_with_socket(const char *name, uint32_t count, int socket_id, bbq_policy_e policy) {
@@ -186,7 +187,7 @@ void bbq_ring_free(bbq_queue_s *q) {
         return;
     }
 
-    for (size_t i = 0; i < q->bn; ++i) {
+    for (uint32_t i = 0; i < q->bn; ++i) {
         block_cleanup(&(q->blocks[i]), q->bs, q->socket_id);
     }
 
@@ -259,7 +260,7 @@ int bbq_dequeue(bbq_queue_s *q, bbq_data *deq_data) {
     }
 }
 
-static bbq_queue_state_s allocate_entry(bbq_queue_s *q, bbq_block_s *block) {
+bbq_queue_state_s allocate_entry(bbq_queue_s *q, bbq_block_s *block) {
     bbq_queue_state_s state;
     if (off(q, atomic_load(&block->allocated)) >= q->bs) {
         state.state = BLOCK_DONE;
@@ -281,12 +282,12 @@ static bbq_queue_state_s allocate_entry(bbq_queue_s *q, bbq_block_s *block) {
     return state;
 }
 
-static void commit_entry(bbq_entry_desc_s *e, bbq_data data) {
+void commit_entry(bbq_entry_desc_s *e, bbq_data data) {
     e->block->entries[e->off] = data;
     atomic_fetch_add(&e->block->committed, 1);
 }
 
-static bbq_queue_state_s advance_phead(bbq_queue_s *q, uint64_t ph) {
+bbq_queue_state_s advance_phead(bbq_queue_s *q, uint64_t ph) {
     // 获取下一个block
     bbq_block_s *n_blk;
     n_blk = &(q->blocks[(idx(q, ph) + 1) & q->idx_mask]);
@@ -330,7 +331,7 @@ static bbq_queue_state_s advance_phead(bbq_queue_s *q, uint64_t ph) {
     return state;
 }
 
-static bbq_queue_state_s reserve_entry(bbq_queue_s *q, bbq_block_s *block) {
+bbq_queue_state_s reserve_entry(bbq_queue_s *q, bbq_block_s *block) {
     while (true) {
         bbq_queue_state_s state;
         uint64_t reserved = atomic_load(&block->reserved);
@@ -371,7 +372,7 @@ static bbq_queue_state_s reserve_entry(bbq_queue_s *q, bbq_block_s *block) {
     }
 }
 
-static bbq_data consume_entry(bbq_queue_s *q, bbq_entry_desc_s *e) {
+bbq_data consume_entry(bbq_queue_s *q, bbq_entry_desc_s *e) {
     bbq_data data = e->block->entries[e->off];
 
     uint64_t allocated;
@@ -391,7 +392,7 @@ static bbq_data consume_entry(bbq_queue_s *q, bbq_entry_desc_s *e) {
     return data;
 }
 
-static bool advance_chead(bbq_queue_s *q, uint64_t ch, uint64_t ver) {
+bool advance_chead(bbq_queue_s *q, uint64_t ch, uint64_t ver) {
     bbq_block_s *n_blk = &(q->blocks[(idx(q, ch) + 1) & q->idx_mask]);
 
     uint64_t committed = atomic_load(&n_blk->committed);
@@ -417,29 +418,29 @@ static bool advance_chead(bbq_queue_s *q, uint64_t ch, uint64_t ver) {
     return true;
 }
 
-static inline uint64_t idx(bbq_queue_s *q, uint64_t x) {
+inline uint64_t idx(bbq_queue_s *q, uint64_t x) {
     return x & q->idx_mask;
 }
 
-static inline uint64_t off(bbq_queue_s *q, uint64_t x) {
+inline uint64_t off(bbq_queue_s *q, uint64_t x) {
     return x & q->off_mask;
 }
 
 // TODO: 可以改进？文档里version移动的位置是max(idx_bits，off_bits)，在advance里，就能直接赋值，MAX(nblk.committed, bbq_cursor{.vsn=ph.vsn + 1});本代码里做了偏移判断。
-static inline uint64_t head_vsn(bbq_queue_s *q, uint64_t x) {
+inline uint64_t head_vsn(bbq_queue_s *q, uint64_t x) {
     return x >> q->idx_bits;
 }
 
-static inline uint64_t cur_vsn(bbq_queue_s *q, uint64_t x) {
+inline uint64_t cur_vsn(bbq_queue_s *q, uint64_t x) {
     return x >> q->off_bits;
 }
 
-static inline uint64_t set_cur_vsn(bbq_queue_s *q, uint64_t ver) {
+inline uint64_t set_cur_vsn(bbq_queue_s *q, uint64_t ver) {
     return ver << q->off_bits;
 }
 
 // TODO:测试
-static inline uint64_t fetch_max(aotmic_uint64 *atom, uint64_t upd) {
+inline uint64_t fetch_max(aotmic_uint64 *atom, uint64_t upd) {
     uint64_t old_value;
     do {
         old_value = atomic_load(atom); // 读取当前值
@@ -490,7 +491,7 @@ void bbq_free(bbq_module_e module, int socket_id, void *ptr, size_t size) {
     }
 }
 
-static void *bbq_memset(void *data, size_t size) {
+void *bbq_memset(void *data, size_t size) {
     if (data != NULL && size > 0) {
         memset(data, 0, size);
     }

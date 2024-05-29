@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-29 09:52:10
+ * @LastEditTime: 2024-05-29 17:48:41
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -15,8 +15,9 @@
 #include <unistd.h>
 
 typedef struct {
-    test_thread_type_e ttype;
     int core;
+    uint32_t busy_loop; // 忙循环次数
+    test_thread_type_e ttype;
     test_cfg *cfg;
     bcm_queue_t *q;
 } bcm_thread_arg_s;
@@ -68,9 +69,9 @@ volatile bool bcm_threads_running = true;
 extern void bbq_memory_info();
 extern bool bbq_malloc_free_equal();
 
-void bcmbusy_loopof() {
+void bcmbusy_loop(uint32_t busy_loop) {
     uint32_t loop = 0;
-    while (loop <= 50) {
+    while (loop <= busy_loop) {
         loop++;
     };
 }
@@ -184,7 +185,7 @@ void *bcm_thread_producer_start(void *arg) {
             } else {
                 test_free(TEST_MODULE_BCM_EXIT_DATA, data);
             }
-            bcmbusy_loopof();
+            bcmbusy_loop(t_arg->busy_loop);
         }
 
         if (ret == 0) {
@@ -263,7 +264,7 @@ void *bcm_thread_consumer_start(void *arg) {
                 }
                 exit_data->complex_data.data_cnt++;
                 test_free(TEST_MODULE_BCM_EXIT_DATA, data);
-                bcmbusy_loopof();
+                bcmbusy_loop(t_arg->busy_loop);
             }
 
             ok_cnt++;
@@ -311,6 +312,7 @@ bcm_one_thread_creat(test_cfg *cfg, bcm_queue_t *q, test_thread_type_e ttype, in
     arg->q = q;
     arg->ttype = ttype;
     arg->core = core;
+    arg->busy_loop = (core + 1) * 7 % 100;
 
     if (ttype == TEST_THREAD_PRODUCER) {
         pthread_create(thread, NULL, bcm_thread_producer_start, arg);
