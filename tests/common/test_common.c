@@ -1,7 +1,7 @@
 /*
  * @Description: 描述信息
  * @Date: 2024-05-25 10:55:48
- * @LastEditTime: 2024-05-28 19:52:35
+ * @LastEditTime: 2024-05-29 09:50:20
  */
 
 #include "test_common.h"
@@ -114,6 +114,10 @@ int test_load_config(const char *config, const char *ring_type, test_cfg *cfg) {
 
     // 设置ring_type
     cfg->ring.ring_type = test_ring_type_str2enum(ring_type);
+    if (cfg->ring.ring_type >= TEST_RING_TYPE_MAX) {
+        BBQ_ERR_LOG("unknown ring type:%d", cfg->ring.ring_type);
+        return -1;
+    }
     BBQ_INFO_LOG("ring_type:%s(%u)", ring_type, cfg->ring.ring_type);
 
     // 释放dictionary对象

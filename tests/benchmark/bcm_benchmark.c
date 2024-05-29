@@ -1,57 +1,57 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-28 23:43:38
+ * @LastEditTime: 2024-05-29 09:52:10
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
+#include "bbq.h"
+#include "bcm_queue.h"
+#include "iniparser.h"
+#include "test_common.h"
 #include <pthread.h>
 #include <stdatomic.h>
 #include <stdlib.h>
 #include <sys/prctl.h>
 #include <unistd.h>
-#include "bbq.h"
-#include "bcm_queue.h"
-#include "iniparser.h"
-#include "test_common.h"
 
 typedef struct {
     test_thread_type_e ttype;
     int core;
-    test_cfg* cfg;
-    bcm_queue_t* q;
+    test_cfg *cfg;
+    bcm_queue_t *q;
 } bcm_thread_arg_s;
 
 typedef struct bcm_benchmark {
-    uint8_t data;                   // 数据
-    test_time_metric enqueue_time;  // 入队时间
+    uint8_t data;                  // 数据
+    test_time_metric enqueue_time; // 入队时间
 } bcm_data;
 
 typedef struct {
-    bcm_data* data;
+    bcm_data *data;
     uint64_t data_cnt;
 } bcm_complex_data;
 
 typedef struct {
     pthread_t thread_id;
-    bcm_thread_arg_s* arg;
+    bcm_thread_arg_s *arg;
     bcm_data simple_data;
     bcm_complex_data complex_data;
     test_time_metric metric_start;
     test_time_metric metric_end;
     uint64_t run_times;
     uint64_t ok_cnt;
-    uint64_t latency_ns;         // 仅消费者有效，数据停留的时延
-    uint64_t op_ok_latency_ns;   // 成功操作的时延
-    uint64_t op_err_latency_ns;  // 操作失败的时延， 如满队入队，空队出队
+    uint64_t latency_ns;        // 仅消费者有效，数据停留的时延
+    uint64_t op_ok_latency_ns;  // 成功操作的时延
+    uint64_t op_err_latency_ns; // 操作失败的时延， 如满队入队，空队出队
 } bcm_exit_data;
 
 typedef struct {
     test_time_metric use_time;
     uint64_t run_times;
     uint64_t ok_cnt;
-    uint64_t latency_ns;         // 仅消费者有效，数据停留的时延
-    uint64_t op_ok_latency_ns;   // 成功操作的时延
-    uint64_t op_err_latency_ns;  // 操作失败的时延， 如满队入队，空队出队
+    uint64_t latency_ns;        // 仅消费者有效，数据停留的时延
+    uint64_t op_ok_latency_ns;  // 成功操作的时延
+    uint64_t op_err_latency_ns; // 操作失败的时延， 如满队入队，空队出队
 } bcm_merge_data;
 
 typedef struct {
@@ -75,10 +75,10 @@ void bcmbusy_loopof() {
     };
 }
 
-void bcm_wait_all_threads_ready(test_cfg* cfg) {
+void bcm_wait_all_threads_ready(test_cfg *cfg) {
     BBQ_INFO_LOG("wait other thread init....");
     uint32_t thread_cnt_max = cfg->ring.consumer_cnt +
-                              cfg->ring.producer_cnt + 1;  //  +1个运行时间控制线程
+                              cfg->ring.producer_cnt + 1; //  +1个运行时间控制线程
 
     atomic_fetch_add(&bcm_thread_now, 1);
     while (atomic_load(&bcm_thread_now) != thread_cnt_max) {
@@ -88,8 +88,8 @@ void bcm_wait_all_threads_ready(test_cfg* cfg) {
     BBQ_INFO_LOG("wait other thread init done!");
 }
 
-bcm_exit_data* bcm_exit_data_create(bcm_thread_arg_s* t_arg) {
-    bcm_exit_data* exit_data = (bcm_exit_data*)test_malloc(TEST_MODULE_BCM, sizeof(bcm_exit_data));
+bcm_exit_data *bcm_exit_data_create(bcm_thread_arg_s *t_arg) {
+    bcm_exit_data *exit_data = (bcm_exit_data *)test_malloc(TEST_MODULE_BCM, sizeof(bcm_exit_data));
     if (exit_data == NULL) {
         BBQ_ERR_LOG("malloc failed");
         exit(-1);
@@ -109,13 +109,13 @@ bcm_exit_data* bcm_exit_data_create(bcm_thread_arg_s* t_arg) {
     return exit_data;
 }
 
-bcm_exit_data* bcm_exit_data_destory(bcm_exit_data* data) {
+bcm_exit_data *bcm_exit_data_destory(bcm_exit_data *data) {
     test_free(TEST_MODULE_BCM, data->complex_data.data);
     test_free(TEST_MODULE_BCM, data->arg);
     test_free(TEST_MODULE_BCM, data);
 }
 
-int bcm_exec_enqueue(bcm_queue_t* q, void* obj, test_time_metric* op_use_diff) {
+int bcm_exec_enqueue(bcm_queue_t *q, void *obj, test_time_metric *op_use_diff) {
     int ret = 0;
 
     test_time_metric op_use_start = test_clock_time_get();
@@ -125,7 +125,7 @@ int bcm_exec_enqueue(bcm_queue_t* q, void* obj, test_time_metric* op_use_diff) {
     return ret;
 }
 
-int bcm_exec_dequeue(bcm_queue_t* q, void** obj, test_time_metric* op_use_diff) {
+int bcm_exec_dequeue(bcm_queue_t *q, void **obj, test_time_metric *op_use_diff) {
     int ret = 0;
 
     test_time_metric op_use_start = test_clock_time_get();
@@ -135,14 +135,14 @@ int bcm_exec_dequeue(bcm_queue_t* q, void** obj, test_time_metric* op_use_diff) 
     return ret;
 }
 
-void* bcm_thread_producer_start(void* arg) {
+void *bcm_thread_producer_start(void *arg) {
     int ret = 0;
     uint64_t ok_cnt = 0;
     uint64_t run_times = 0;
-    bcm_thread_arg_s* t_arg = (bcm_thread_arg_s*)arg;
-    test_cfg* cfg = t_arg->cfg;
-    bcm_queue_t* q = t_arg->q;
-    bcm_exit_data* exit_data = bcm_exit_data_create(t_arg);
+    bcm_thread_arg_s *t_arg = (bcm_thread_arg_s *)arg;
+    test_cfg *cfg = t_arg->cfg;
+    bcm_queue_t *q = t_arg->q;
+    bcm_exit_data *exit_data = bcm_exit_data_create(t_arg);
     char thread_name[128] = {0};
     uint64_t op_ok_latency_ns = 0;
     uint64_t op_err_latency_ns = 0;
@@ -168,7 +168,7 @@ void* bcm_thread_producer_start(void* arg) {
         if (cfg->ring.workload == TEST_WORKLOAD_SIMPLE) {
             ret = bcm_exec_enqueue(q, &(exit_data->simple_data), &op_latency);
         } else {
-            bcm_data* data = test_malloc(TEST_MODULE_BCM_EXIT_DATA, sizeof(bcm_data));
+            bcm_data *data = test_malloc(TEST_MODULE_BCM_EXIT_DATA, sizeof(bcm_data));
             if (data == NULL) {
                 BBQ_ERR_LOG("malloc falied");
                 exit(-1);
@@ -208,14 +208,14 @@ void* bcm_thread_producer_start(void* arg) {
     pthread_exit(exit_data);
 }
 
-void* bcm_thread_consumer_start(void* arg) {
+void *bcm_thread_consumer_start(void *arg) {
     int ret = 0;
     uint64_t ok_cnt = 0;
     uint64_t run_times = 0;
-    bcm_thread_arg_s* t_arg = (bcm_thread_arg_s*)arg;
-    test_cfg* cfg = t_arg->cfg;
-    bcm_queue_t* q = t_arg->q;
-    bcm_exit_data* exit_data = bcm_exit_data_create(t_arg);
+    bcm_thread_arg_s *t_arg = (bcm_thread_arg_s *)arg;
+    test_cfg *cfg = t_arg->cfg;
+    bcm_queue_t *q = t_arg->q;
+    bcm_exit_data *exit_data = bcm_exit_data_create(t_arg);
     uint64_t latency_ns = 0;
     test_time_metric op_latency = {0};
     uint64_t op_ok_latency_ns;
@@ -236,9 +236,9 @@ void* bcm_thread_consumer_start(void* arg) {
             break;
         }
 
-        bcm_data* data = NULL;
+        bcm_data *data = NULL;
 
-        ret = bcm_exec_dequeue(q, (void**)(&data), &op_latency);
+        ret = bcm_exec_dequeue(q, (void **)(&data), &op_latency);
         if (ret == 0) {
             if (t_arg->cfg->ring.workload == TEST_WORKLOAD_SIMPLE) {
                 if (data->data != BCM_SIMPLE_DATA_MAGIC) {
@@ -269,7 +269,6 @@ void* bcm_thread_consumer_start(void* arg) {
             ok_cnt++;
             op_ok_latency_ns += test_clock_time_to_ns(&op_latency);
         } else {
-            printf("zzzzz ret=%d\n", ret);
             op_err_latency_ns += test_clock_time_to_ns(&op_latency);
         }
 
@@ -292,8 +291,8 @@ void* bcm_thread_consumer_start(void* arg) {
     pthread_exit(exit_data);
 }
 
-void* bcm_thread_run_time_set(void* arg) {
-    test_cfg* cfg = (test_cfg*)arg;
+void *bcm_thread_run_time_set(void *arg) {
+    test_cfg *cfg = (test_cfg *)arg;
     pthread_detach(pthread_self());
 
     bcm_wait_all_threads_ready(cfg);
@@ -303,11 +302,11 @@ void* bcm_thread_run_time_set(void* arg) {
     }
 }
 
-pthread_t*
-bcm_one_thread_creat(test_cfg* cfg, bcm_queue_t* q, test_thread_type_e ttype, int core, pthread_t* thread) {
+pthread_t *
+bcm_one_thread_creat(test_cfg *cfg, bcm_queue_t *q, test_thread_type_e ttype, int core, pthread_t *thread) {
     BBQ_INFO_LOG("thread type:%d core:%d", ttype, core);
 
-    bcm_thread_arg_s* arg = (bcm_thread_arg_s*)test_malloc(TEST_MODULE_BCM, sizeof(bcm_thread_arg_s));  // 线程回收时free
+    bcm_thread_arg_s *arg = (bcm_thread_arg_s *)test_malloc(TEST_MODULE_BCM, sizeof(bcm_thread_arg_s)); // 线程回收时free
     arg->cfg = cfg;
     arg->q = q;
     arg->ttype = ttype;
@@ -325,13 +324,13 @@ bcm_one_thread_creat(test_cfg* cfg, bcm_queue_t* q, test_thread_type_e ttype, in
         core_id = (core_id + 1) < max_id ? (core_id + 1) : core_id; \
     } while (0)
 
-pthread_t* bcm_threads_creat(test_cfg* cfg, bcm_queue_t* q) {
+pthread_t *bcm_threads_creat(test_cfg *cfg, bcm_queue_t *q) {
     // 创建生产者消费者线程
     int ret;
     size_t thread_id = 0;
     int core_id = 0;
     size_t thread_cnt = cfg->ring.producer_cnt + cfg->ring.consumer_cnt;
-    pthread_t* threads = (pthread_t*)test_malloc(TEST_MODULE_BCM, sizeof(pthread_t) * thread_cnt);  // 存储所有线程ID的数组
+    pthread_t *threads = (pthread_t *)test_malloc(TEST_MODULE_BCM, sizeof(pthread_t) * thread_cnt); // 存储所有线程ID的数组
 
     // MPSC 或 SPMC 场景在第一个核心/超线程上分配单个生产者或消费者，然后将其他线程按顺序分配给核心/超线程。
     // MPMC，我们将生产者和消费者一一交错分配
@@ -352,8 +351,8 @@ pthread_t* bcm_threads_creat(test_cfg* cfg, bcm_queue_t* q) {
         }
     } else {
         // MPMC 或 只有生产者 或这有消费者，核心交错分配
-        uint32_t pcnt = cfg->ring.producer_cnt;  // 生产者个数
-        uint32_t ccnt = cfg->ring.consumer_cnt;  // 消费者个数
+        uint32_t pcnt = cfg->ring.producer_cnt; // 生产者个数
+        uint32_t ccnt = cfg->ring.consumer_cnt; // 消费者个数
         for (core_id = 0; core_id < cfg->base.cores_cnt && pcnt > 0 && ccnt > 0;) {
             if ((core_id & 1) == 0) {
                 // 偶数
@@ -380,18 +379,18 @@ pthread_t* bcm_threads_creat(test_cfg* cfg, bcm_queue_t* q) {
     return threads;
 }
 
-void bcm_threads_destory(pthread_t* threads) {
+void bcm_threads_destory(pthread_t *threads) {
     test_free(TEST_MODULE_BCM, threads);
 }
 
-void bcm_merge_data_detail(bcm_merge_data* merge, bcm_exit_data* exit_data) {
+void bcm_merge_data_detail(bcm_merge_data *merge, bcm_exit_data *exit_data) {
     merge->run_times += exit_data->run_times;
     merge->ok_cnt += exit_data->ok_cnt;
     merge->latency_ns += exit_data->latency_ns;
     merge->op_err_latency_ns = exit_data->op_err_latency_ns;
     merge->op_ok_latency_ns += exit_data->op_ok_latency_ns;
 }
-void bcm_merge_all_data(bcm_exit_data** exit_data, uint32_t thread_cnt, bcm_merge* merge) {
+void bcm_merge_all_data(bcm_exit_data **exit_data, uint32_t thread_cnt, bcm_merge *merge) {
     test_time_metric p_start = {0};
     test_time_metric p_end = {0};
     test_time_metric c_start = {0};
@@ -426,7 +425,7 @@ void bcm_merge_all_data(bcm_exit_data** exit_data, uint32_t thread_cnt, bcm_merg
     merge->consumer.use_time = test_clock_time_sub(c_end, c_start);
 }
 
-void bcm_report_printf(test_cfg* cfg, bcm_merge_data* data, bcm_exit_data** raw_data, uint32_t thread_cnt, test_thread_type_e ttype) {
+void bcm_report_printf(test_cfg *cfg, bcm_merge_data *data, bcm_exit_data **raw_data, uint32_t thread_cnt, test_thread_type_e ttype) {
     char name[10] = {0};
     double latency_ns = 0;
     double throughput = 0;
@@ -478,7 +477,7 @@ void bcm_report_printf(test_cfg* cfg, bcm_merge_data* data, bcm_exit_data** raw_
     }
 }
 
-void bcm_report_generate(test_cfg* cfg, bcm_exit_data** exit_data, uint32_t thread_cnt) {
+void bcm_report_generate(test_cfg *cfg, bcm_exit_data **exit_data, uint32_t thread_cnt) {
     // test_report report;
 
     bcm_merge merge = {0};
@@ -495,7 +494,7 @@ void bcm_report_generate(test_cfg* cfg, bcm_exit_data** exit_data, uint32_t thre
     }
 }
 
-#if 0
+#if 1
 int main(int argc, char *argv[]) {
     char *config;
     char *ring_type;
@@ -578,14 +577,14 @@ int loop_cnt = 30;
 // int test_cnt = 16384;
 // int loop_cnt = 3;
 
-void* pstart(void* arg) {
-    bbq_queue_s* q = (bbq_queue_s*)arg;
+void *pstart(void *arg) {
+    bbq_queue_s *q = (bbq_queue_s *)arg;
 
     int ret = 0;
     uint32_t ok_cnt = 0;
 
     for (int i = 0; i < test_cnt; i++) {
-        int* data = (int*)malloc(sizeof(int));
+        int *data = (int *)malloc(sizeof(int));
         *data = 123;
         ret = bbq_enqueue(q, data);
         if (ret == 0) {
@@ -600,14 +599,14 @@ void* pstart(void* arg) {
     printf("------------------------------p ok_cnt:%u\n", ok_cnt);
 }
 
-void* cstart(void* arg) {
-    bbq_queue_s* q = (bbq_queue_s*)arg;
-    int* data;
+void *cstart(void *arg) {
+    bbq_queue_s *q = (bbq_queue_s *)arg;
+    int *data;
     int ret = 0;
     uint32_t ok_cnt = 0;
 
     for (int i = 0; i < test_cnt; i++) {
-        ret = bbq_dequeue(q, (void**)&data);
+        ret = bbq_dequeue(q, (void **)&data);
         if (ret == 0) {
             if (*data != 123) {
                 printf(".........!!!!!!!!  *data !=123,  is :%d\n", *data);
@@ -626,7 +625,7 @@ void* cstart(void* arg) {
 
 int main() {
 #define TCNT 10
-    bbq_queue_s* q = bbq_ring_create_bnbs_with_socket("bbq_ring", bn, bs, -1, BBQ_RETRY_NEW);
+    bbq_queue_s *q = bbq_ring_create_bnbs_with_socket("bbq_ring", bn, bs, -1, BBQ_RETRY_NEW);
     if (q == NULL) {
         BBQ_ERR_LOG("bbq_ring_create_with_socket failed");
         return BBQ_NULL_PTR;
