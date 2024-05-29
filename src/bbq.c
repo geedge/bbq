@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-29 18:46:50
+ * @LastEditTime: 2024-05-29 19:51:37
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -37,10 +37,10 @@ bool bbq_is_power_of_two(uint32_t n) {
 
 // 根据entries大小返回合理的blocks配置
 uint32_t bbq_blocks_calc(uint32_t entries) {
-    double log_entries = log2((double)entries);   // 计算log2(entries)
+    double log_entries = log2((double)entries);
     uint32_t over4 = (uint32_t)(log_entries / 4); // 向下取整
-    uint32_t max_value = (over4 > 1) ? over4 : 1; // 取1和log_y_over_4中的较大值
-    uint32_t n = pow(2, max_value);               // 计算n = 2^max_value
+    uint32_t max_value = (over4 > 1) ? over4 : 1;
+    uint32_t n = pow(2, max_value);
     return n;
 }
 
