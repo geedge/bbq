@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu@geedgenetworks.com
- * @LastEditTime: 2024-05-30 14:00:57
+ * @LastEditTime: 2024-05-30 22:02:57
  * @Describe:
  */
 
@@ -17,7 +17,6 @@
 
 #ifndef __cplusplus
 // C
-// typedef _Atomic uint64_t aotmic_uint64;
 typedef atomic_uint_fast64_t aotmic_uint64;
 typedef aotmic_uint64 bbq_cursor; // 块内的四种游标（version|offset）
 typedef aotmic_uint64 bbq_head;   // 指向块的索引（version|idx）
@@ -25,9 +24,10 @@ typedef aotmic_uint64 bbq_head;   // 指向块的索引（version|idx）
 // C++ 为了兼容gtest测试
 using bbq_cursor = std::atomic<uint64_t>;
 using bbq_head = std::atomic<uint64_t>;
+using aotmic_uint64 = std::atomic<uint64_t>;
 #endif
 
-typedef void *bbq_data;
+typedef void *bbq_data; // TODO:
 
 typedef struct {
     bbq_cursor committed; // 已提交
@@ -131,6 +131,8 @@ extern void bbq_ring_free(bbq_queue_s *q);
 extern int bbq_enqueue(bbq_queue_s *q, bbq_data data);
 extern int bbq_dequeue(bbq_queue_s *q, bbq_data *deq_data);
 extern void bbq_debug_struct_print(bbq_queue_s *q);
+
+// -----------------------------用于单元测试-------------------------------
 
 // -----------------------------错误码-------------------------------
 // 通用返回码

@@ -1,18 +1,69 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-30 11:25:16
+ * @LastEditTime: 2024-05-30 22:46:47
  * @Email: liuyu@geedgenetworks.com
  * @Describe: bbq除了队列操作外，其他函数的测试
  */
 #include "gtest/gtest.h"
 extern "C" {
+#include "bbq.h"
 #include "ut.h"
 #include <math.h>
 extern bool bbq_is_power_of_two(int n);
 extern uint32_t bbq_blocks_calc(uint32_t entries);
 extern unsigned ceil_log2(uint64_t x);
+extern uint64_t fetch_max(aotmic_uint64 *atom, uint64_t upd);
 }
 namespace {
+
+typedef struct {
+    uint64_t thread_cnt;
+    aotmic_uint64 data;
+    aotmic_uint64 ready_thread_cnt;
+} ut_fetch_arg;
+
+void *fetch_max_thread_func(void *arg) {
+    ut_fetch_arg *fetch_arg = (ut_fetch_arg *)arg;
+    fetch_arg->ready_thread_cnt.fetch_add(1);
+
+    while (fetch_arg->ready_thread_cnt.load() != fetch_arg->thread_cnt) {
+    }
+
+    uint64_t *ret = (uint64_t *)malloc(sizeof(*ret));
+    // 不同线程写入不同的>3的数
+    *ret = fetch_max(&fetch_arg->data, pthread_self() + 3);
+    pthread_exit(ret);
+}
+
+TEST(bbq_mix, fetch_max) {
+    uint64_t ret = 0;
+    ut_fetch_arg arg = {0};
+    arg.data.store(1); // 初始化1
+    arg.thread_cnt = 50;
+
+    ret = fetch_max(&arg.data, 2); // max比较后设置为2
+    EXPECT_EQ(arg.data.load(), 2);
+    EXPECT_EQ(ret, 1);
+
+    pthread_t *threads = (pthread_t *)test_malloc(TEST_MODULE_UTEST, sizeof(*threads) * arg.thread_cnt);
+    for (uint64_t i = 0; i < arg.thread_cnt; i++) {
+        // 多个线程同时fetch_max，输入 > 3的数据
+        pthread_create(&threads[i], NULL, fetch_max_thread_func, (void *)&arg);
+    }
+
+    int eq_cnt = 0;
+    for (int i = 0; i < arg.thread_cnt; i++) {
+        uint64_t *tret;
+        pthread_join(threads[i], (void **)&tret); // 等待每个线程结束
+        if (*tret == 2) {
+            eq_cnt++; // 统计返回2的个数
+        }
+        test_free(TEST_MODULE_UTEST, tret);
+    }
+
+    EXPECT_EQ(eq_cnt, 1);
+    test_free(TEST_MODULE_UTEST, threads);
+}
 
 TEST(bbq_mix, power_of_two) {
     uint32_t tmp = 0;

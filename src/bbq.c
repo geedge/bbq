@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-30 17:46:46
+ * @LastEditTime: 2024-05-30 22:02:10
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -224,6 +224,13 @@ int bbq_enqueue(bbq_queue_s *q, bbq_data data) {
     }
 }
 
+// int bbq_dequeue_burst(bbq_queue_s *q, void **obj_table, unsigned int n, unsigned int *available) {
+// }
+
+// int bbq_enqueue_burst(bbq_queue_s *q, void *const *obj_table,
+//                       unsigned int n, unsigned int *free_space) {
+// }
+
 // TODO:入参检查，出队失败，数据设置NULL？
 int bbq_dequeue(bbq_queue_s *q, bbq_data *deq_data) {
     while (true) {
@@ -266,7 +273,6 @@ bbq_queue_state_s allocate_entry(bbq_queue_s *q, bbq_block_s *block) {
         return state;
     }
 
-    // TODO:check 有没有影响?检查是否会因为多线程同时add，超过了预留的位段，溢出后实际已超，但是认为还有数据？？？？所有游标是不是都有这个问题？
     uint64_t old = atomic_fetch_add(&block->allocated, 1);
     uint64_t committed_vsn = cur_vsn(q, atomic_load(&block->committed));
 
@@ -362,7 +368,7 @@ bbq_queue_state_s reserve_entry(bbq_queue_s *q, bbq_block_s *block) {
                 }
             }
 
-            if (fetch_max(&block->reserved, reserved + 1) == reserved) { // TODO:多entry时关注
+            if (fetch_max(&block->reserved, reserved + 1) == reserved) { // TODO:多entry时关注,论文说max不够用了。
                 // fetch_max返回的是旧值，因此预期返回的旧值要等于局部变量reserved
                 state.state = RESERVED;
                 state.e.block = block;
@@ -450,8 +456,7 @@ inline uint64_t set_cur_vsn(bbq_queue_s *q, uint64_t ver) {
     return ver << q->off_bits;
 }
 
-// TODO:测试
-inline uint64_t fetch_max(aotmic_uint64 *atom, uint64_t upd) {
+uint64_t fetch_max(aotmic_uint64 *atom, uint64_t upd) {
     uint64_t old_value;
     do {
         old_value = atomic_load(atom); // 读取当前值
@@ -553,29 +558,4 @@ void bbq_memory_info() {
         BBQ_ERR_LOG("memory not all free");
     }
 #endif
-}
-
-void bbq_debug_struct_print(bbq_queue_s *q) {
-    // printf("%s\n", q->name);
-    // printf("%d\n", q->socket_id);
-    // printf("bs:%ld\n", q->bs);
-    // printf("bn:%ld\n", q->bn);
-    // printf("policy:%d\n", q->policy);
-    // printf("idx_bits:%u\n", q->idx_bits);
-    // printf("off_bits:%u\n", q->off_bits);
-    // printf("off_bits:%u\n", q->off_bits);
-    // printf("idx_mask:%u\n", q->idx_mask);
-    // printf("off_mask:%u\n", q->off_mask);
-
-    printf("phead vsn:%u idx:%u\n", head_vsn(q, q->phead), idx(q, q->phead));
-    printf("chead vsn:%u idx:%u\n", head_vsn(q, q->chead), idx(q, q->chead));
-
-    for (int i = 0; i < q->bn; i++) {
-        printf("[%d]\n", i);
-        printf("  allocated vsn:%u idx:%u\n", cur_vsn(q, q->blocks[i].allocated), off(q, q->blocks[i].allocated));
-        printf("  committed vsn:%u idx:%u\n", cur_vsn(q, q->blocks[i].committed), off(q, q->blocks[i].committed));
-        printf("  reserved vsn:%u idx:%u\n", cur_vsn(q, q->blocks[i].reserved), off(q, q->blocks[i].reserved));
-        printf("  consumed vsn:%u idx:%u\n", cur_vsn(q, q->blocks[i].consumed), off(q, q->blocks[i].consumed));
-        printf("\n");
-    }
 }

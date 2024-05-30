@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-30 10:30:03
+ * @LastEditTime: 2024-05-30 22:56:14
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -34,52 +34,68 @@ size_t bs = 4096;
 size_t pthread_cnt = 1; // 生产者线程个数
 size_t cthread_cnt = 1; // 消费者线程个数
 
-// 空队满队的边界测试
 TEST(boundary, full_empty) {
     int ret = 0;
+    uint32_t entries_cnt = 4096;
+    uint32_t loop = 1000;
     bbq_queue_s *q;
-    // 1.初始队列
-    q = bbq_ring_create_bnbs_with_socket("bbq_ring", bn, bs, 0, BBQ_RETRY_NEW);
-    EXPECT_TRUE(q != NULL) << "FAILED-1";
 
-    int cnt = bn * bs;
-    testdata_s *data = (testdata_s *)malloc(sizeof(testdata_s) * cnt);
+    int *data = (int *)test_malloc(TEST_MODULE_UTEST, sizeof(*data) * entries_cnt);
+    void *tmp_data;
+    EXPECT_TRUE(data);
+    EXPECT_TRUE(tmp_data);
 
-    // 2.入满队列，成功
-    int en_status;
-    for (int i = 0; i < cnt; i++) {
-        data[i].v1 = i;
-        data[i].v2 = i;
-        en_status = bbq_enqueue(q, &data[i]);
-        EXPECT_TRUE(en_status == BBQ_OK) << "FAILED-2 when enqueue,  i:" << i << " en_status:%d " << en_status;
+    q = bbq_ring_create("ring", entries_cnt, BBQ_RETRY_NEW);
+    EXPECT_TRUE(q);
+
+    for (uint32_t i = 0; i < loop; i++) {
+        // 入满队
+        for (uint32_t j = 0; j < entries_cnt; j++) {
+            data[j] = (i + 1) * j;
+            ret = bbq_enqueue(q, &data[j]);
+            EXPECT_TRUE(ret == BBQ_OK) << "ret " << ret;
+        }
+
+        // 满队再入队
+        for (uint32_t j = 0; j < entries_cnt / 3; j++) {
+            ret = bbq_enqueue(q, &data[j]);
+            EXPECT_TRUE(ret == BBQ_QUEUE_FULL);
+        }
+
+        if (i == 0) {
+            EXPECT_EQ((q->phead.load() + 1) & q->idx_mask, q->chead.load() & q->idx_mask);
+        } else {
+            EXPECT_EQ((q->phead.load()) & q->idx_mask, q->chead.load() & q->idx_mask);
+        }
+        for (uint32_t i = 0; i < q->bn; i++) {
+            EXPECT_EQ(q->blocks[i].committed.load() & q->off_mask, q->bs);
+            EXPECT_GE(q->blocks[i].allocated.load() & q->off_mask, q->bs);
+        }
+
+        // 全出队
+        for (uint32_t j = 0; j < entries_cnt; j++) {
+            ret = bbq_dequeue(q, &tmp_data);
+            EXPECT_TRUE(ret == BBQ_OK);
+            EXPECT_EQ(*((int *)tmp_data), data[j]);
+        }
+
+        // 空出队再出队
+        for (uint32_t j = 0; j < entries_cnt / 2; j++) {
+            ret = bbq_dequeue(q, &tmp_data);
+            EXPECT_TRUE(ret == BBQ_QUEUE_EMPTY);
+        }
+
+        EXPECT_EQ(q->phead.load() & q->idx_mask, q->chead.load() & q->idx_mask);
+        for (uint32_t i = 0; i < q->bn; i++) {
+            EXPECT_EQ(q->blocks[i].committed.load() & q->off_mask, q->bs);
+            EXPECT_GE(q->blocks[i].allocated.load() & q->off_mask, q->bs);
+            EXPECT_EQ(q->blocks[i].consumed.load() & q->off_mask, q->bs);
+            EXPECT_GE(q->blocks[i].reserved.load() & q->off_mask, q->bs);
+        }
     }
 
-    // 3.再入队（满），失败
-    en_status = bbq_enqueue(q, &data[0]);
-    EXPECT_TRUE(en_status == BBQ_QUEUE_FULL) << "FAILED-3";
-
-    int de_status;
-    // 4.出满队列，成功
-    for (int i = 0; i < cnt; i++) {
-        bbq_data de_data = NULL;
-        de_status = bbq_dequeue(q, &de_data);
-        EXPECT_TRUE(de_status == BBQ_OK) << "FAILED-4 when dequeue,  i:" << i << " en_status:%d " << en_status;
-        EXPECT_EQ(i, ((testdata_s *)de_data)->v1) << "FAILED 5";
-        EXPECT_EQ(i, ((testdata_s *)de_data)->v2) << "FAILED 6";
-    }
-
-    // 5.再出队（空），失败
-    bbq_data de_data = NULL;
-    de_status = bbq_dequeue(q, &de_data);
-    EXPECT_TRUE(de_status == BBQ_QUEUE_EMPTY) << "FAILED 7";
-
+    test_free(TEST_MODULE_UTEST, data);
     bbq_ring_free(q);
-
-    free(data);
-#ifdef BBQ_DEBUG
-    bbq_memory_info();
-    EXPECT_EQ(true, bbq_malloc_free_equal()) << "FAILED 9";
-#endif
 }
 
 // 多生产者多消费者参加，生产者更快
