@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu@geedgenetworks.com
- * @LastEditTime: 2024-05-29 18:47:54
+ * @LastEditTime: 2024-05-30 14:00:57
  * @Describe:
  */
 
@@ -75,17 +75,16 @@ typedef struct {
     int socket_id; // 在哪个socket_id上使用libnuma分配内存，-1表示无效，使用malloc分配
     size_t bs;     // blocks里entries成员的大小
     size_t bn;     // blocks成员的大小
-    bbq_head phead;
-    bbq_head chead;
     bbq_policy_e policy;
-    bbq_block_s *blocks; // BN大小的动态数组
-
     unsigned idx_bits;
     unsigned off_bits;
     uint64_t idx_mask;
     uint64_t off_mask;
 
     char name[BBQ_NAME_MAXLEN];
+    bbq_head phead;
+    bbq_head chead;
+    bbq_block_s *blocks; // BN大小的动态数组
 } bbq_queue_s;
 
 typedef enum {

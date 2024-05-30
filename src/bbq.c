@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-29 19:51:37
+ * @LastEditTime: 2024-05-30 17:46:46
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -50,17 +50,17 @@ int block_init(bbq_block_s *block, uint32_t bs, bool cursor_init, int socket_id)
         BBQ_ERR_LOG("bbq_malloc error");
         return BBQ_ALLOC_ERR;
     }
-    block->committed = 0;
-    block->allocated = 0;
-    block->reserved = 0;
-    block->consumed = 0;
+    block->committed = ATOMIC_VAR_INIT(0);
+    block->allocated = ATOMIC_VAR_INIT(0);
+    block->reserved = ATOMIC_VAR_INIT(0);
+    block->consumed = ATOMIC_VAR_INIT(0);
 
     if (cursor_init) {
         // block数组里，除了第一块之外需要设置
-        block->committed |= bs;
-        block->allocated |= bs;
-        block->reserved |= bs;
-        block->consumed |= bs;
+        block->committed = ATOMIC_VAR_INIT(bs);
+        block->allocated = ATOMIC_VAR_INIT(bs);
+        block->reserved = ATOMIC_VAR_INIT(bs);
+        block->consumed = ATOMIC_VAR_INIT(bs);
     }
 
     return BBQ_OK;
@@ -144,9 +144,9 @@ bbq_queue_s *bbq_ring_create_bnbs_with_socket(const char *name, uint32_t bn, uin
         }
     }
 
-    // TODO:是否需要考虑确认，bits位是否满了，无法给version留空间？？即限制BN和BS的边界?ceil_log2返回值至少<64?
     q->idx_bits = ceil_log2(bn);
-    q->off_bits = ceil_log2(bs) + 1; // TODO:  +1 是否合理？如果BS较小，线程较多，+1够吗？
+    q->off_bits = ceil_log2(bs) + 1;
+
     q->idx_mask = (1 << q->idx_bits) - 1;
     q->off_mask = (1 << q->off_bits) - 1;
 
@@ -171,8 +171,8 @@ bbq_queue_s *bbq_ring_create(const char *name, uint32_t count, bbq_policy_e poli
 }
 
 bbq_queue_s *bbq_ring_create_with_socket(const char *name, uint32_t count, int socket_id, bbq_policy_e policy) {
-    if (bbq_is_power_of_two(count) == false || count == 1) {
-        BBQ_ERR_LOG("bbq entries number is not power of two, now is  :%lu", count);
+    if (bbq_is_power_of_two(count) == false) {
+        BBQ_ERR_LOG("bbq entries number must be power of two and greater than 1, now is  :%lu", count);
         return NULL;
     }
 
@@ -181,7 +181,6 @@ bbq_queue_s *bbq_ring_create_with_socket(const char *name, uint32_t count, int s
     return bbq_ring_create_bnbs_with_socket(name, bn, bs, socket_id, policy);
 }
 
-// TODO:检查队列是否都被消费了再删除？
 void bbq_ring_free(bbq_queue_s *q) {
     if (q == NULL) {
         return;
@@ -261,7 +260,7 @@ int bbq_dequeue(bbq_queue_s *q, bbq_data *deq_data) {
 }
 
 bbq_queue_state_s allocate_entry(bbq_queue_s *q, bbq_block_s *block) {
-    bbq_queue_state_s state;
+    bbq_queue_state_s state = {0};
     if (off(q, atomic_load(&block->allocated)) >= q->bs) {
         state.state = BLOCK_DONE;
         return state;
@@ -269,7 +268,10 @@ bbq_queue_state_s allocate_entry(bbq_queue_s *q, bbq_block_s *block) {
 
     // TODO:check 有没有影响?检查是否会因为多线程同时add，超过了预留的位段，溢出后实际已超，但是认为还有数据？？？？所有游标是不是都有这个问题？
     uint64_t old = atomic_fetch_add(&block->allocated, 1);
-    if (off(q, old) >= q->bs) {
+    uint64_t committed_vsn = cur_vsn(q, atomic_load(&block->committed));
+
+    // committed_vsn，在当前块被初始化后值是不变的，判断vsn是考虑到极限情况下给off预留的空间不足导致，allocated的off溢出（vsn+1）
+    if ((cur_vsn(q, old) != committed_vsn) || (off(q, old) >= q->bs)) {
         state.state = BLOCK_DONE;
         return state;
     }
@@ -293,12 +295,13 @@ bbq_queue_state_s advance_phead(bbq_queue_s *q, uint64_t ph) {
     n_blk = &(q->blocks[(idx(q, ph) + 1) & q->idx_mask]);
 
     uint64_t cur, reserved;
-    bbq_queue_state_s state;
+    bbq_queue_state_s state = {0};
     switch (q->policy) {
     case BBQ_RETRY_NEW:
         // consumed
         cur = atomic_load(&n_blk->consumed);
-        if (cur_vsn(q, cur) < head_vsn(q, ph) || (cur_vsn(q, cur) == head_vsn(q, ph) && off(q, cur) != q->bs)) {
+        if (cur_vsn(q, cur) < head_vsn(q, ph) || // 生产者赶上了消费者
+            (cur_vsn(q, cur) == head_vsn(q, ph) && off(q, cur) != q->bs)) {
             reserved = atomic_load(&n_blk->reserved);
             if (off(q, reserved) == off(q, cur)) {
                 state.state = NO_ENTRY;
@@ -325,7 +328,7 @@ bbq_queue_state_s advance_phead(bbq_queue_s *q, uint64_t ph) {
     fetch_max(&n_blk->committed, set_cur_vsn(q, head_vsn(q, ph) + 1));
     fetch_max(&n_blk->allocated, set_cur_vsn(q, head_vsn(q, ph) + 1));
 
-    // 索引+1，当超过索引范围，也就是循环下一轮块时，version+1????
+    // 索引+1，当超过索引范围，也就是循环下一轮块时，version+1
     fetch_max(&q->phead, ph + 1);
     state.state = SUCCESS;
     return state;
@@ -336,13 +339,21 @@ bbq_queue_state_s reserve_entry(bbq_queue_s *q, bbq_block_s *block) {
         bbq_queue_state_s state;
         uint64_t reserved = atomic_load(&block->reserved);
         if (off(q, reserved) < q->bs) {
+            uint64_t consumed = atomic_load(&block->consumed);
+            if (cur_vsn(q, reserved) != cur_vsn(q, consumed)) {
+                // consumed溢出了
+                state.state = BLOCK_DONE;
+                state.vsn = cur_vsn(q, reserved);
+                return state;
+            }
+
             uint64_t committed = atomic_load(&block->committed);
-            if (off(q, committed) == off(q, reserved)) { // TODO: 多entry的时候关注
+            if (off(q, committed) == off(q, reserved)) { // TODO:多entry关注
                 state.state = NO_ENTRY;
                 return state;
             }
 
-            // 当前块的数据没有被全部comit，需要通过判断allocated和committed来判断是否存在正在入队进行中的数据
+            // 当前块的数据没有被全部commited，需要通过判断allocated和committed来判断是否存在正在入队进行中的数据
             if (off(q, committed) != q->bs) {
                 uint64_t allocated = atomic_load(&block->allocated);
                 if (off(q, allocated) != off(q, committed)) {
@@ -351,7 +362,7 @@ bbq_queue_state_s reserve_entry(bbq_queue_s *q, bbq_block_s *block) {
                 }
             }
 
-            if (fetch_max(&block->reserved, reserved + 1) == reserved) {
+            if (fetch_max(&block->reserved, reserved + 1) == reserved) { // TODO:多entry时关注
                 // fetch_max返回的是旧值，因此预期返回的旧值要等于局部变量reserved
                 state.state = RESERVED;
                 state.e.block = block;
@@ -367,7 +378,6 @@ bbq_queue_state_s reserve_entry(bbq_queue_s *q, bbq_block_s *block) {
 
         state.state = BLOCK_DONE;
         state.vsn = cur_vsn(q, reserved);
-
         return state;
     }
 }
@@ -398,8 +408,10 @@ bool advance_chead(bbq_queue_s *q, uint64_t ch, uint64_t ver) {
     uint64_t committed = atomic_load(&n_blk->committed);
     switch (q->policy) {
     case BBQ_RETRY_NEW:
-        if (cur_vsn(q, committed) != head_vsn(q, ch) + 1)
+        if (cur_vsn(q, committed) != head_vsn(q, ch) + 1) {
+            // 消费者追上了生产者，下一块还未开始生产
             return false;
+        }
         fetch_max(&n_blk->consumed, set_cur_vsn(q, head_vsn(q, ch) + 1));
         fetch_max(&n_blk->reserved, set_cur_vsn(q, head_vsn(q, ch) + 1));
         break;
@@ -426,7 +438,6 @@ inline uint64_t off(bbq_queue_s *q, uint64_t x) {
     return x & q->off_mask;
 }
 
-// TODO: 可以改进？文档里version移动的位置是max(idx_bits，off_bits)，在advance里，就能直接赋值，MAX(nblk.committed, bbq_cursor{.vsn=ph.vsn + 1});本代码里做了偏移判断。
 inline uint64_t head_vsn(bbq_queue_s *q, uint64_t x) {
     return x >> q->idx_bits;
 }
