@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-30 22:02:10
+ * @LastEditTime: 2024-05-31 14:22:34
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -16,10 +16,10 @@ extern bbq_queue_state_s advance_phead(bbq_queue_s *q, uint64_t ph);
 extern bbq_queue_state_s reserve_entry(bbq_queue_s *q, bbq_block_s *block);
 extern bbq_data consume_entry(bbq_queue_s *q, bbq_entry_desc_s *e);
 extern bool advance_chead(bbq_queue_s *q, uint64_t ch, uint64_t ver);
-extern inline uint64_t idx(bbq_queue_s *q, uint64_t x);
-extern inline uint64_t off(bbq_queue_s *q, uint64_t x);
-extern inline uint64_t head_vsn(bbq_queue_s *q, uint64_t x);
-extern inline uint64_t cur_vsn(bbq_queue_s *q, uint64_t x);
+extern inline uint64_t bbq_idx(bbq_queue_s *q, uint64_t x);
+extern inline uint64_t bbq_off(bbq_queue_s *q, uint64_t x);
+extern inline uint64_t bbq_head_vsn(bbq_queue_s *q, uint64_t x);
+extern inline uint64_t bbq_cur_vsn(bbq_queue_s *q, uint64_t x);
 extern inline uint64_t set_cur_vsn(bbq_queue_s *q, uint64_t ver);
 extern inline uint64_t fetch_max(aotmic_uint64 *atom, uint64_t upd);
 extern void *bbq_memset(void *data, size_t size);
@@ -198,7 +198,7 @@ int bbq_enqueue(bbq_queue_s *q, bbq_data data) {
     while (true) {
         // 获取当前phead，转为索引后获取到当前的blk
         uint64_t ph = atomic_load(&q->phead);
-        bbq_block_s *blk = &(q->blocks[idx(q, ph)]);
+        bbq_block_s *blk = &(q->blocks[bbq_idx(q, ph)]);
 
         bbq_queue_state_s ps;
         bbq_queue_state_s state = allocate_entry(q, blk);
@@ -235,7 +235,7 @@ int bbq_enqueue(bbq_queue_s *q, bbq_data data) {
 int bbq_dequeue(bbq_queue_s *q, bbq_data *deq_data) {
     while (true) {
         uint64_t ch = atomic_load(&q->chead);
-        bbq_block_s *blk = &(q->blocks[idx(q, ch)]);
+        bbq_block_s *blk = &(q->blocks[bbq_idx(q, ch)]);
 
         bbq_data data;
         bbq_queue_state_s state;
@@ -268,37 +268,37 @@ int bbq_dequeue(bbq_queue_s *q, bbq_data *deq_data) {
 
 bbq_queue_state_s allocate_entry(bbq_queue_s *q, bbq_block_s *block) {
     bbq_queue_state_s state = {0};
-    if (off(q, atomic_load(&block->allocated)) >= q->bs) {
+    if (bbq_off(q, atomic_load(&block->allocated)) >= q->bs) {
         state.state = BLOCK_DONE;
         return state;
     }
 
     uint64_t old = atomic_fetch_add(&block->allocated, 1);
-    uint64_t committed_vsn = cur_vsn(q, atomic_load(&block->committed));
+    uint64_t committed_vsn = bbq_cur_vsn(q, atomic_load(&block->committed));
 
     // committed_vsn，在当前块被初始化后值是不变的，判断vsn是考虑到极限情况下给off预留的空间不足导致，allocated的off溢出（vsn+1）
-    if ((cur_vsn(q, old) != committed_vsn) || (off(q, old) >= q->bs)) {
+    if ((bbq_cur_vsn(q, old) != committed_vsn) || (bbq_off(q, old) >= q->bs)) {
         state.state = BLOCK_DONE;
         return state;
     }
 
     state.state = ALLOCATED;
     state.e.block = block;
-    state.e.vsn = cur_vsn(q, old);
-    state.e.off = off(q, old);
+    state.e.vsn = bbq_cur_vsn(q, old);
+    state.e.bbq_off = bbq_off(q, old);
 
     return state;
 }
 
 void commit_entry(bbq_entry_desc_s *e, bbq_data data) {
-    e->block->entries[e->off] = data;
+    e->block->entries[e->bbq_off] = data;
     atomic_fetch_add(&e->block->committed, 1);
 }
 
 bbq_queue_state_s advance_phead(bbq_queue_s *q, uint64_t ph) {
     // 获取下一个block
     bbq_block_s *n_blk;
-    n_blk = &(q->blocks[(idx(q, ph) + 1) & q->idx_mask]);
+    n_blk = &(q->blocks[(bbq_idx(q, ph) + 1) & q->idx_mask]);
 
     uint64_t cur, reserved;
     bbq_queue_state_s state = {0};
@@ -306,10 +306,10 @@ bbq_queue_state_s advance_phead(bbq_queue_s *q, uint64_t ph) {
     case BBQ_RETRY_NEW:
         // consumed
         cur = atomic_load(&n_blk->consumed);
-        if (cur_vsn(q, cur) < head_vsn(q, ph) || // 生产者赶上了消费者
-            (cur_vsn(q, cur) == head_vsn(q, ph) && off(q, cur) != q->bs)) {
+        if (bbq_cur_vsn(q, cur) < bbq_head_vsn(q, ph) || // 生产者赶上了消费者
+            (bbq_cur_vsn(q, cur) == bbq_head_vsn(q, ph) && bbq_off(q, cur) != q->bs)) {
             reserved = atomic_load(&n_blk->reserved);
-            if (off(q, reserved) == off(q, cur)) {
+            if (bbq_off(q, reserved) == bbq_off(q, cur)) {
                 state.state = NO_ENTRY;
             } else {
                 state.state = NOT_AVAILABLE;
@@ -321,7 +321,7 @@ bbq_queue_state_s advance_phead(bbq_queue_s *q, uint64_t ph) {
         // committed
         cur = atomic_load(&n_blk->committed);
         // 生产者避免前进到上一轮中尚未完全提交的区块，TODO: 什么时候回来出现< 或 >的情况？？？
-        if (cur_vsn(q, cur) == head_vsn(q, ph) && off(q, cur) != q->bs) {
+        if (bbq_cur_vsn(q, cur) == bbq_head_vsn(q, ph) && bbq_off(q, cur) != q->bs) {
             state.state = NOT_AVAILABLE;
             return state;
         }
@@ -331,8 +331,8 @@ bbq_queue_state_s advance_phead(bbq_queue_s *q, uint64_t ph) {
     }
 
     // 用head的version初始化下一个块，version在高位，version+1，idex/offset清零，如果没有被其他线程执行过，数值会高于旧值。多线程同时只更新一次。
-    fetch_max(&n_blk->committed, set_cur_vsn(q, head_vsn(q, ph) + 1));
-    fetch_max(&n_blk->allocated, set_cur_vsn(q, head_vsn(q, ph) + 1));
+    fetch_max(&n_blk->committed, set_cur_vsn(q, bbq_head_vsn(q, ph) + 1));
+    fetch_max(&n_blk->allocated, set_cur_vsn(q, bbq_head_vsn(q, ph) + 1));
 
     // 索引+1，当超过索引范围，也就是循环下一轮块时，version+1
     fetch_max(&q->phead, ph + 1);
@@ -344,25 +344,25 @@ bbq_queue_state_s reserve_entry(bbq_queue_s *q, bbq_block_s *block) {
     while (true) {
         bbq_queue_state_s state;
         uint64_t reserved = atomic_load(&block->reserved);
-        if (off(q, reserved) < q->bs) {
+        if (bbq_off(q, reserved) < q->bs) {
             uint64_t consumed = atomic_load(&block->consumed);
-            if (cur_vsn(q, reserved) != cur_vsn(q, consumed)) {
+            if (bbq_cur_vsn(q, reserved) != bbq_cur_vsn(q, consumed)) {
                 // consumed溢出了
                 state.state = BLOCK_DONE;
-                state.vsn = cur_vsn(q, reserved);
+                state.vsn = bbq_cur_vsn(q, reserved);
                 return state;
             }
 
             uint64_t committed = atomic_load(&block->committed);
-            if (off(q, committed) == off(q, reserved)) { // TODO:多entry关注
+            if (bbq_off(q, committed) == bbq_off(q, reserved)) { // TODO:多entry关注
                 state.state = NO_ENTRY;
                 return state;
             }
 
             // 当前块的数据没有被全部commited，需要通过判断allocated和committed来判断是否存在正在入队进行中的数据
-            if (off(q, committed) != q->bs) {
+            if (bbq_off(q, committed) != q->bs) {
                 uint64_t allocated = atomic_load(&block->allocated);
-                if (off(q, allocated) != off(q, committed)) {
+                if (bbq_off(q, allocated) != bbq_off(q, committed)) {
                     state.state = NOT_AVAILABLE;
                     return state;
                 }
@@ -372,8 +372,8 @@ bbq_queue_state_s reserve_entry(bbq_queue_s *q, bbq_block_s *block) {
                 // fetch_max返回的是旧值，因此预期返回的旧值要等于局部变量reserved
                 state.state = RESERVED;
                 state.e.block = block;
-                state.e.off = off(q, reserved);
-                state.e.vsn = cur_vsn(q, reserved);
+                state.e.bbq_off = bbq_off(q, reserved);
+                state.e.vsn = bbq_cur_vsn(q, reserved);
 
                 return state;
             } else {
@@ -383,13 +383,13 @@ bbq_queue_state_s reserve_entry(bbq_queue_s *q, bbq_block_s *block) {
         }
 
         state.state = BLOCK_DONE;
-        state.vsn = cur_vsn(q, reserved);
+        state.vsn = bbq_cur_vsn(q, reserved);
         return state;
     }
 }
 
 bbq_data consume_entry(bbq_queue_s *q, bbq_entry_desc_s *e) {
-    bbq_data data = e->block->entries[e->off];
+    bbq_data data = e->block->entries[e->bbq_off];
 
     uint64_t allocated;
     switch (q->policy) {
@@ -398,7 +398,7 @@ bbq_data consume_entry(bbq_queue_s *q, bbq_entry_desc_s *e) {
         break;
     case BBQ_DROP_OLD:
         allocated = atomic_fetch_add(&e->block->allocated, 1);
-        if (cur_vsn(q, allocated) != e->vsn)
+        if (bbq_cur_vsn(q, allocated) != e->vsn)
             return NULL;
         break;
     default:
@@ -409,24 +409,24 @@ bbq_data consume_entry(bbq_queue_s *q, bbq_entry_desc_s *e) {
 }
 
 bool advance_chead(bbq_queue_s *q, uint64_t ch, uint64_t ver) {
-    bbq_block_s *n_blk = &(q->blocks[(idx(q, ch) + 1) & q->idx_mask]);
+    bbq_block_s *n_blk = &(q->blocks[(bbq_idx(q, ch) + 1) & q->idx_mask]);
 
     uint64_t committed = atomic_load(&n_blk->committed);
     switch (q->policy) {
     case BBQ_RETRY_NEW:
-        if (cur_vsn(q, committed) != head_vsn(q, ch) + 1) {
+        if (bbq_cur_vsn(q, committed) != bbq_head_vsn(q, ch) + 1) {
             // 消费者追上了生产者，下一块还未开始生产
             return false;
         }
-        fetch_max(&n_blk->consumed, set_cur_vsn(q, head_vsn(q, ch) + 1));
-        fetch_max(&n_blk->reserved, set_cur_vsn(q, head_vsn(q, ch) + 1));
+        fetch_max(&n_blk->consumed, set_cur_vsn(q, bbq_head_vsn(q, ch) + 1));
+        fetch_max(&n_blk->reserved, set_cur_vsn(q, bbq_head_vsn(q, ch) + 1));
         break;
     case BBQ_DROP_OLD:
         // 通过检查下一个块的版本是否大于或等于当前块来保证 FIFO 顺序，是这种情况，reserved 将被重置为已提交的版本·
-        // 第一个块是一个特殊情况，因为与其他块相比，它的版本总是相差一个。因此，如果 ch.idx == 0，我们在比较中加 1
-        if (cur_vsn(q, committed) < ver + (idx(q, ch) == 0))
+        // 第一个块是一个特殊情况，因为与其他块相比，它的版本总是相差一个。因此，如果 ch.bbq_idx == 0，我们在比较中加 1
+        if (bbq_cur_vsn(q, committed) < ver + (bbq_idx(q, ch) == 0))
             return false;
-        fetch_max(&n_blk->reserved, set_cur_vsn(q, cur_vsn(q, committed)));
+        fetch_max(&n_blk->reserved, set_cur_vsn(q, bbq_cur_vsn(q, committed)));
         break;
     default:
         break;
@@ -436,19 +436,19 @@ bool advance_chead(bbq_queue_s *q, uint64_t ch, uint64_t ver) {
     return true;
 }
 
-inline uint64_t idx(bbq_queue_s *q, uint64_t x) {
+inline uint64_t bbq_idx(bbq_queue_s *q, uint64_t x) {
     return x & q->idx_mask;
 }
 
-inline uint64_t off(bbq_queue_s *q, uint64_t x) {
+inline uint64_t bbq_off(bbq_queue_s *q, uint64_t x) {
     return x & q->off_mask;
 }
 
-inline uint64_t head_vsn(bbq_queue_s *q, uint64_t x) {
+inline uint64_t bbq_head_vsn(bbq_queue_s *q, uint64_t x) {
     return x >> q->idx_bits;
 }
 
-inline uint64_t cur_vsn(bbq_queue_s *q, uint64_t x) {
+inline uint64_t bbq_cur_vsn(bbq_queue_s *q, uint64_t x) {
     return x >> q->off_bits;
 }
 

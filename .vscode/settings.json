@@ -90,6 +90,7 @@
         "test_common.h": "c",
         "numa.h": "c",
         "test_mix.h": "c",
-        "test_queue.h": "c"
+        "test_queue.h": "c",
+        "prctl.h": "c"
     }
 }

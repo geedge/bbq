@@ -1,7 +1,7 @@
 /*
  * @Description: 描述信息
  * @Date: 2024-05-25 10:55:48
- * @LastEditTime: 2024-05-31 10:02:46
+ * @LastEditTime: 2024-05-31 11:25:32
  */
 
 #include "test_mix.h"
@@ -24,6 +24,13 @@ void *test_malloc(test_module_e module, size_t size) {
     }
 
     return ptr;
+}
+
+void *test_calloc(test_module_e module, size_t size) {
+    void *ptr = test_malloc(module, size);
+    if (ptr != NULL) {
+        memset(ptr, 0, size);
+    }
 }
 
 void test_free(test_module_e module, void *ptr) {
@@ -119,7 +126,7 @@ int test_load_config(const char *config, const char *ring_type, test_cfg *cfg) {
         return -1;
     }
     BBQ_INFO_LOG("ring_type:%s(%u)", ring_type, cfg->ring.ring_type);
-
+    cfg->run.running = true;
     // 释放dictionary对象
     iniparser_freedict(ini);
     return 0;

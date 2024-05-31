@@ -1,12 +1,13 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-31 10:21:41
+ * @LastEditTime: 2024-05-31 17:32:50
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
 #ifndef _TEST_MIX_H_
 #define _TEST_MIX_H_
 
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -64,7 +65,16 @@ typedef struct {
 typedef struct {
     uint64_t enq_per_producer; // 每个线程入队次数
     uint64_t deq_per_consumer; // 每个线程出队次数
-    uint64_t run_time;    // 整体运行时间，单位秒
+    uint64_t run_time;         // 整体运行时间，单位秒
+    volatile bool running;     // 默认为true，当设置为false，即所有生产者消费者即将退出
+
+#ifndef __cplusplus
+    // C
+    atomic_uint thread_now;
+#else
+    // C++ 为了兼容gtest测试
+    std::atomic<uint32_t> thread_now;
+#endif
 } test_cfg_run;
 
 typedef struct {
@@ -75,8 +85,9 @@ typedef struct {
 
 typedef enum {
     TEST_MODULE_UTEST,
+    TEST_MODULE_COMMON,
+    TEST_MODULE_COMMON_EXIT_DATA,
     TEST_MODULE_BCM,
-    TEST_MODULE_BCM_EXIT_DATA,
     TEST_MODULE_MAX,
 } test_module_e;
 
@@ -91,6 +102,7 @@ extern char *test_ring_type_enum2str(test_ring_type ring_type);
 extern uint64_t test_clock_time_to_ns(test_time_metric *metric);
 extern uint64_t test_clock_time_to_double(test_time_metric *metric);
 extern void *test_malloc(test_module_e module, size_t size);
+extern void *test_calloc(test_module_e module, size_t size);
 extern void test_free(test_module_e module, void *ptr);
 extern void test_memory_info();
 #endif

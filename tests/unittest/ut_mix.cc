@@ -1,12 +1,13 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-30 22:46:47
+ * @LastEditTime: 2024-05-31 17:21:00
  * @Email: liuyu@geedgenetworks.com
  * @Describe: bbq除了队列操作外，其他函数的测试
  */
 #include "gtest/gtest.h"
 extern "C" {
 #include "bbq.h"
+#include "test_mix.h"
 #include "ut.h"
 #include <math.h>
 extern bool bbq_is_power_of_two(int n);
@@ -123,8 +124,8 @@ TEST(bbq_mix, ceil_log2) {
     uint32_t max = pow(2, 32) - 1;
 
     tmp = 2;
-    for (uint32_t val = 1, idx = 0; val < max; val *= tmp, idx++) {
-        EXPECT_TRUE(idx == ceil_log2(val));
+    for (uint32_t val = 1, bbq_idx = 0; val < max; val *= tmp, bbq_idx++) {
+        EXPECT_TRUE(bbq_idx == ceil_log2(val));
         if (val >= max / tmp) {
             break;
         }

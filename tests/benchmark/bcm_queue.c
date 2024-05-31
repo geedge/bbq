@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-31 10:18:02
+ * @LastEditTime: 2024-05-31 10:52:23
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -29,7 +29,7 @@ int test_queue_init_dpdk(test_cfg *cfg, test_queue_s *q) {
     }
 
     q->ring = (void *)rte_ring_create("dpdk_ring", cfg->ring.entries_cnt, rte_socket_id(), RING_F_MP_RTS_ENQ | RING_F_MC_RTS_DEQ);
-    if (q->dpdk_ring == NULL) {
+    if (q->ring == NULL) {
         return BBQ_NULL_PTR;
     }
 

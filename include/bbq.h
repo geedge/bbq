@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu@geedgenetworks.com
- * @LastEditTime: 2024-05-30 22:02:57
+ * @LastEditTime: 2024-05-31 17:34:41
  * @Describe:
  */
 
@@ -48,7 +48,7 @@ typedef enum {
 
 typedef struct {
     bbq_block_s *block; // 指向所在的block
-    uint64_t off;       // entry在当前block的偏移(offset)
+    uint64_t bbq_off;   // entry在当前block的偏移(offset)
     uint64_t vsn;       // allocated游标的版本(version)
 } bbq_entry_desc_s;
 
@@ -134,6 +134,10 @@ extern void bbq_debug_struct_print(bbq_queue_s *q);
 
 // -----------------------------用于单元测试-------------------------------
 
+extern uint64_t bbq_idx(bbq_queue_s *q, uint64_t x);
+extern uint64_t bbq_off(bbq_queue_s *q, uint64_t x);
+extern uint64_t bbq_head_vsn(bbq_queue_s *q, uint64_t x);
+extern uint64_t bbq_cur_vsn(bbq_queue_s *q, uint64_t x);
 // -----------------------------错误码-------------------------------
 // 通用返回码
 #define BBQ_OK 0            // 成功
