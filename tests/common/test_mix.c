@@ -1,10 +1,10 @@
 /*
  * @Description: 描述信息
  * @Date: 2024-05-25 10:55:48
- * @LastEditTime: 2024-05-30 19:23:18
+ * @LastEditTime: 2024-05-31 10:02:46
  */
 
-#include "test_common.h"
+#include "test_mix.h"
 #include "bbq.h"
 #include "iniparser.h"
 #include <string.h>
@@ -103,11 +103,11 @@ int test_load_config(const char *config, const char *ring_type, test_cfg *cfg) {
     cfg->ring.block_count = iniparser_getint(ini, "ring:block_count", 0);
     BBQ_INFO_LOG("block_count:%u", cfg->ring.block_count);
 
-    cfg->run.enqueue_cnt = iniparser_getint(ini, "run:enqueue_cnt", 0);
-    BBQ_INFO_LOG("enqueue_cnt:%lu", cfg->run.enqueue_cnt);
+    cfg->run.enq_per_producer = iniparser_getint(ini, "run:enq_per_producer", 0);
+    BBQ_INFO_LOG("enq_per_producer:%lu", cfg->run.enq_per_producer);
 
-    cfg->run.dequeue_cnt = iniparser_getint(ini, "run:dequeue_cnt", 0);
-    BBQ_INFO_LOG("dequeue_cnt:%lu", cfg->run.dequeue_cnt);
+    cfg->run.deq_per_consumer = iniparser_getint(ini, "run:deq_per_consumer", 0);
+    BBQ_INFO_LOG("deq_per_consumer:%lu", cfg->run.deq_per_consumer);
 
     cfg->run.run_time = iniparser_getuint64(ini, "run:run_time", 0);
     BBQ_INFO_LOG("run_time:%lu", cfg->run.run_time);

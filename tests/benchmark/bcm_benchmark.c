@@ -1,16 +1,18 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-29 17:48:41
+ * @LastEditTime: 2024-05-31 10:20:00
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
 #include "bbq.h"
 #include "bcm_queue.h"
 #include "iniparser.h"
-#include "test_common.h"
+#include "test_mix.h"
+#include "test_queue.h"
 #include <pthread.h>
 #include <stdatomic.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/prctl.h>
 #include <unistd.h>
 
@@ -19,7 +21,7 @@ typedef struct {
     uint32_t busy_loop; // 忙循环次数
     test_thread_type_e ttype;
     test_cfg *cfg;
-    bcm_queue_t *q;
+    test_queue_s *q;
 } bcm_thread_arg_s;
 
 typedef struct bcm_benchmark {
@@ -99,8 +101,8 @@ bcm_exit_data *bcm_exit_data_create(bcm_thread_arg_s *t_arg) {
     exit_data->arg = t_arg;
     exit_data->thread_id = pthread_self();
     exit_data->simple_data.data = BCM_SIMPLE_DATA_MAGIC;
-    if (t_arg->cfg->run.enqueue_cnt > 0) {
-        exit_data->complex_data.data = test_malloc(TEST_MODULE_BCM, t_arg->cfg->run.enqueue_cnt * sizeof(bcm_data));
+    if (t_arg->cfg->run.enq_per_producer > 0) {
+        exit_data->complex_data.data = test_malloc(TEST_MODULE_BCM, t_arg->cfg->run.enq_per_producer * sizeof(bcm_data));
     } else {
         exit_data->complex_data.data = NULL;
     }
@@ -116,7 +118,7 @@ bcm_exit_data *bcm_exit_data_destory(bcm_exit_data *data) {
     test_free(TEST_MODULE_BCM, data);
 }
 
-int bcm_exec_enqueue(bcm_queue_t *q, void *obj, test_time_metric *op_use_diff) {
+int bcm_exec_enqueue(test_queue_s *q, void *obj, test_time_metric *op_use_diff) {
     int ret = 0;
 
     test_time_metric op_use_start = test_clock_time_get();
@@ -126,7 +128,7 @@ int bcm_exec_enqueue(bcm_queue_t *q, void *obj, test_time_metric *op_use_diff) {
     return ret;
 }
 
-int bcm_exec_dequeue(bcm_queue_t *q, void **obj, test_time_metric *op_use_diff) {
+int bcm_exec_dequeue(test_queue_s *q, void **obj, test_time_metric *op_use_diff) {
     int ret = 0;
 
     test_time_metric op_use_start = test_clock_time_get();
@@ -142,7 +144,7 @@ void *bcm_thread_producer_start(void *arg) {
     uint64_t run_times = 0;
     bcm_thread_arg_s *t_arg = (bcm_thread_arg_s *)arg;
     test_cfg *cfg = t_arg->cfg;
-    bcm_queue_t *q = t_arg->q;
+    test_queue_s *q = t_arg->q;
     bcm_exit_data *exit_data = bcm_exit_data_create(t_arg);
     char thread_name[128] = {0};
     uint64_t op_ok_latency_ns = 0;
@@ -157,7 +159,7 @@ void *bcm_thread_producer_start(void *arg) {
 
     exit_data->metric_start = test_clock_time_get();
     while (true) {
-        if (cfg->run.enqueue_cnt > 0 && run_times >= cfg->run.enqueue_cnt) {
+        if (cfg->run.enq_per_producer > 0 && run_times >= cfg->run.enq_per_producer) {
             // 控制次数的循环
             break;
         }
@@ -215,7 +217,7 @@ void *bcm_thread_consumer_start(void *arg) {
     uint64_t run_times = 0;
     bcm_thread_arg_s *t_arg = (bcm_thread_arg_s *)arg;
     test_cfg *cfg = t_arg->cfg;
-    bcm_queue_t *q = t_arg->q;
+    test_queue_s *q = t_arg->q;
     bcm_exit_data *exit_data = bcm_exit_data_create(t_arg);
     uint64_t latency_ns = 0;
     test_time_metric op_latency = {0};
@@ -232,7 +234,7 @@ void *bcm_thread_consumer_start(void *arg) {
 
     exit_data->metric_start = test_clock_time_get();
     while (true) {
-        if (cfg->run.dequeue_cnt > 0 && run_times >= cfg->run.dequeue_cnt) {
+        if (cfg->run.deq_per_consumer > 0 && run_times >= cfg->run.deq_per_consumer) {
             // 控制次数的循环
             break;
         }
@@ -304,7 +306,7 @@ void *bcm_thread_run_time_set(void *arg) {
 }
 
 pthread_t *
-bcm_one_thread_creat(test_cfg *cfg, bcm_queue_t *q, test_thread_type_e ttype, int core, pthread_t *thread) {
+bcm_one_thread_creat(test_cfg *cfg, test_queue_s *q, test_thread_type_e ttype, int core, pthread_t *thread) {
     BBQ_INFO_LOG("thread type:%d core:%d", ttype, core);
 
     bcm_thread_arg_s *arg = (bcm_thread_arg_s *)test_malloc(TEST_MODULE_BCM, sizeof(bcm_thread_arg_s)); // 线程回收时free
@@ -326,7 +328,7 @@ bcm_one_thread_creat(test_cfg *cfg, bcm_queue_t *q, test_thread_type_e ttype, in
         core_id = (core_id + 1) < max_id ? (core_id + 1) : core_id; \
     } while (0)
 
-pthread_t *bcm_threads_creat(test_cfg *cfg, bcm_queue_t *q) {
+pthread_t *bcm_threads_creat(test_cfg *cfg, test_queue_s *q) {
     // 创建生产者消费者线程
     int ret;
     size_t thread_id = 0;
@@ -523,7 +525,7 @@ int main(int argc, char *argv[]) {
 
     // 队列初始化
     int ret = -1;
-    bcm_queue_t q;
+    test_queue_s q;
     ret = bcm_queue_init(&cfg, &q);
     if (ret != 0) {
         BBQ_ERR_LOG("init failed :%d", ret);
@@ -563,7 +565,7 @@ int main(int argc, char *argv[]) {
     }
     test_free(TEST_MODULE_BCM, exit_data);
     bcm_threads_destory(threads);
-    bcm_queue_destory(&q);
+    test_queue_destory(&q);
     bbq_memory_info();
     test_memory_info();
     return 0;

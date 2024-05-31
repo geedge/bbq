@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-30 22:56:14
+ * @LastEditTime: 2024-05-31 10:23:48
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -9,6 +9,7 @@
 #include <limits.h>
 
 extern "C" {
+#include "test_queue.h"
 #include "ut.h"
 extern int bbq_malloc_free_equal();
 extern void bbq_memory_info();
@@ -96,6 +97,43 @@ TEST(boundary, full_empty) {
 
     test_free(TEST_MODULE_UTEST, data);
     bbq_ring_free(q);
+}
+
+TEST(boundary, mpsc_faa) {
+    test_cfg cfg = {
+        .base = {
+            .name = "mpsc_faa",
+            .introduce = "mpsc_faa",
+            .cores_cnt = 4,
+        },
+        .ring = {
+            .ring_type = TEST_RING_TYPE_BBQ,
+            .producer_cnt = 10,
+            .consumer_cnt = 1,
+            .workload = TEST_WORKLOAD_SIMPLE,
+            .entries_cnt = 1,
+            .block_count = 1,
+        },
+        .run = {
+            .enq_per_producer = 1000000,
+            .deq_per_consumer = 1000000,
+        },
+    };
+
+    // 队列初始化
+    int ret = -1;
+    test_queue_s *q = NULL;
+    ret = test_queue_init_bbq(&cfg, q);
+    ASSERT_TRUE(ret == 0);
+
+    // 创建线程
+    // pthread_t *threads = bcm_threads_creat(&cfg, &q);
+    // ASSERT_TRUE(threads);
+
+    // if (ret != 0) {
+    //     BBQ_ERR_LOG("init failed :%d", ret);
+    //     return ret;
+    // }
 }
 
 // 多生产者多消费者参加，生产者更快

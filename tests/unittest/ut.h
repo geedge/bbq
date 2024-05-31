@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-29 19:11:25
+ * @LastEditTime: 2024-05-31 10:02:49
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -8,7 +8,7 @@
 #ifndef _UT_H_
 #define _UT_H_
 #include "bbq.h"
-#include "test_common.h"
+#include "test_mix.h"
 #include <stdint.h>
 
 typedef struct {

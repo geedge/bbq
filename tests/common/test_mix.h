@@ -1,11 +1,11 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-28 19:52:59
+ * @LastEditTime: 2024-05-31 10:21:41
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
-#ifndef _TEST_COMMON_H_
-#define _TEST_COMMON_H_
+#ifndef _TEST_MIX_H_
+#define _TEST_MIX_H_
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -62,8 +62,8 @@ typedef struct {
 } test_cfg_ring;
 
 typedef struct {
-    uint64_t enqueue_cnt; // 每个线程入队次数
-    uint64_t dequeue_cnt; // 每个线程出队次数
+    uint64_t enq_per_producer; // 每个线程入队次数
+    uint64_t deq_per_consumer; // 每个线程出队次数
     uint64_t run_time;    // 整体运行时间，单位秒
 } test_cfg_run;
 

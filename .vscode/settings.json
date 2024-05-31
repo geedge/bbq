@@ -88,6 +88,8 @@
         "bbq_common.h": "c",
         "bcm_common.h": "c",
         "test_common.h": "c",
-        "numa.h": "c"
+        "numa.h": "c",
+        "test_mix.h": "c",
+        "test_queue.h": "c"
     }
 }
