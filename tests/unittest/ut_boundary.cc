@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-02 12:06:57
+ * @LastEditTime: 2024-06-02 12:48:28
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -42,7 +42,7 @@ TEST(boundary, full_empty) {
     void *tmp_data = NULL;
     EXPECT_TRUE(data);
 
-    q = bbq_ring_create("ring", entries_cnt, BBQ_RETRY_NEW);
+    q = bbq_ring_create("ring", entries_cnt, NULL);
     EXPECT_TRUE(q);
 
     for (uint32_t i = 0; i < loop; i++) {

@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu@geedgenetworks.com
- * @LastEditTime: 2024-05-31 17:34:41
+ * @LastEditTime: 2024-06-02 12:46:57
  * @Describe:
  */
 
@@ -123,10 +123,10 @@ typedef enum {
     } while (0)
 
 // -----------------------------对外接口-------------------------------
-extern bbq_queue_s *bbq_ring_create(const char *name, uint32_t count, bbq_policy_e policy);
-extern bbq_queue_s *bbq_ring_create_with_socket(const char *name, uint32_t count, int socket_id, bbq_policy_e policy);
-extern bbq_queue_s *bbq_ring_create_bnbs(const char *name, uint32_t bn, uint32_t bs, bbq_policy_e policy);
-extern bbq_queue_s *bbq_ring_create_bnbs_with_socket(const char *name, uint32_t bn, uint32_t bs, int socket_id, bbq_policy_e policy);
+extern bbq_queue_s *bbq_ring_create(const char *name, uint32_t count, void (*drop_old_free_func)(void *arg));
+extern bbq_queue_s *bbq_ring_create_with_socket(const char *name, uint32_t count, int socket_id, void (*drop_old_free_func)(void *arg));
+extern bbq_queue_s *bbq_ring_create_bnbs(const char *name, uint32_t bn, uint32_t bs, void (*drop_old_free_func)(void *arg));
+extern bbq_queue_s *bbq_ring_create_bnbs_with_socket(const char *name, uint32_t bn, uint32_t bs, int socket_id, void (*drop_old_free_func)(void *arg));
 extern void bbq_ring_free(bbq_queue_s *q);
 extern int bbq_enqueue(bbq_queue_s *q, bbq_data data);
 extern int bbq_dequeue(bbq_queue_s *q, bbq_data *deq_data);

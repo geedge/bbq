@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-01 01:07:34
+ * @LastEditTime: 2024-06-02 12:48:48
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -87,11 +87,11 @@ unsigned ceil_log2(uint64_t x) {
     return x == 1 ? 0 : floor_log2(x - 1) + 1;
 }
 
-bbq_queue_s *bbq_ring_create_bnbs(const char *name, uint32_t bn, uint32_t bs, bbq_policy_e policy) {
-    return bbq_ring_create_bnbs_with_socket(name, bn, bs, BBQ_INVALID_SOCKET, policy);
+bbq_queue_s *bbq_ring_create_bnbs(const char *name, uint32_t bn, uint32_t bs, void (*drop_old_free_func)(void *arg)) {
+    return bbq_ring_create_bnbs_with_socket(name, bn, bs, BBQ_INVALID_SOCKET, drop_old_free_func);
 }
 
-bbq_queue_s *bbq_ring_create_bnbs_with_socket(const char *name, uint32_t bn, uint32_t bs, int socket_id, bbq_policy_e policy) {
+bbq_queue_s *bbq_ring_create_bnbs_with_socket(const char *name, uint32_t bn, uint32_t bs, int socket_id, void (*drop_old_free_func)(void *arg)) {
     int ret = 0;
     bool numa_enable = true;
 
@@ -127,7 +127,12 @@ bbq_queue_s *bbq_ring_create_bnbs_with_socket(const char *name, uint32_t bn, uin
     q->socket_id = socket_id;
     q->phead = 0;
     q->chead = 0;
-    q->policy = policy;
+
+    if (drop_old_free_func == NULL) {
+        q->policy = BBQ_RETRY_NEW;
+    } else {
+        q->policy = BBQ_DROP_OLD;
+    }
     q->blocks = bbq_malloc(BBQ_MODULE_QUEUE_BLOCK_NB, socket_id, bn * sizeof(bbq_block_s));
     if (q->blocks == NULL) {
         BBQ_ERR_LOG("bbq malloc for blocks error");
@@ -165,12 +170,12 @@ error:
     return NULL;
 }
 
-bbq_queue_s *bbq_ring_create(const char *name, uint32_t count, bbq_policy_e policy) {
+bbq_queue_s *bbq_ring_create(const char *name, uint32_t count, void (*drop_old_free_func)(void *arg)) {
     // 传入无效socket_id，将使用malloc分配内存
-    return bbq_ring_create_with_socket(name, count, BBQ_INVALID_SOCKET, policy);
+    return bbq_ring_create_with_socket(name, count, BBQ_INVALID_SOCKET, drop_old_free_func);
 }
 
-bbq_queue_s *bbq_ring_create_with_socket(const char *name, uint32_t count, int socket_id, bbq_policy_e policy) {
+bbq_queue_s *bbq_ring_create_with_socket(const char *name, uint32_t count, int socket_id, void (*drop_old_free_func)(void *arg)) {
     if (bbq_is_power_of_two(count) == false) {
         BBQ_ERR_LOG("bbq entries number must be power of two and greater than 1, now is  :%lu", count);
         return NULL;
@@ -178,7 +183,7 @@ bbq_queue_s *bbq_ring_create_with_socket(const char *name, uint32_t count, int s
 
     uint32_t bn = bbq_blocks_calc(count);
     uint32_t bs = count / bn;
-    return bbq_ring_create_bnbs_with_socket(name, bn, bs, socket_id, policy);
+    return bbq_ring_create_bnbs_with_socket(name, bn, bs, socket_id, drop_old_free_func);
 }
 
 void bbq_ring_free(bbq_queue_s *q) {
