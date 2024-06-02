@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-31 18:17:57
+ * @LastEditTime: 2024-06-02 12:13:55
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -78,15 +78,19 @@ void bcm_report_generate(test_cfg *cfg, test_exit_data **exit_data, uint32_t thr
     test_merge_s merge = {0};
     test_merge_all_data(exit_data, thread_cnt, &merge);
 
-    BBQ_CLOR_PRINT("ring类型:%s", test_ring_type_enum2str(cfg->ring.ring_type));
-    BBQ_CLOR_PRINT("简介:%s", cfg->base.introduce);
-    BBQ_CLOR_PRINT("配置:%s", cfg->base.name);
+    BBQ_CLOR_PRINT("ring类型: %s", test_ring_type_enum2str(cfg->ring.ring_type));
+    BBQ_CLOR_PRINT("简介: %s", cfg->base.introduce);
+    BBQ_CLOR_PRINT("配置: %s", cfg->base.name);
     if (cfg->ring.producer_cnt > 0) {
         bcm_report_printf(cfg, &merge.producer, exit_data, thread_cnt, TEST_THREAD_PRODUCER);
     }
 
     if (cfg->ring.consumer_cnt > 0) {
         bcm_report_printf(cfg, &merge.consumer, exit_data, thread_cnt, TEST_THREAD_CONSUMER);
+    }
+
+    if (cfg->ring.producer_cnt > 0 && cfg->ring.consumer_cnt > 0) {
+        BBQ_CLOR_PRINT("生产消费个数验证: %s", merge.consumer.ok_cnt == merge.producer.ok_cnt ? "相等" : "不等!!!!!!!!!");
     }
 }
 

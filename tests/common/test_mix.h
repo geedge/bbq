@@ -70,10 +70,12 @@ typedef struct {
 
 #ifndef __cplusplus
     // C
-    atomic_uint thread_now;
+    atomic_uint thread_start;
+    atomic_uint producer_exit;
 #else
     // C++ 为了兼容gtest测试
-    std::atomic<uint32_t> thread_now;
+    std::atomic<uint32_t> thread_start;
+    std::atomic<uint32_t> producer_exit;
 #endif
 } test_cfg_run;
 

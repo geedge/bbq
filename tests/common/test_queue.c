@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-02 09:18:43
+ * @LastEditTime: 2024-06-02 12:07:22
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -50,12 +50,15 @@ void test_queue_destory(test_queue_s *q) {
     }
 }
 
+bool test_all_producer_exit(test_cfg *cfg) {
+    return atomic_load(&cfg->run.producer_exit) == cfg->ring.producer_cnt;
+}
+
 void test_wait_all_threads_ready(test_cfg *cfg) {
     uint32_t thread_cnt_max = cfg->ring.consumer_cnt +
                               cfg->ring.producer_cnt;
 
-    atomic_fetch_add(&cfg->run.thread_now, 1);
-    while (atomic_load(&cfg->run.thread_now) != thread_cnt_max) {
+    while (atomic_load(&cfg->run.thread_start) != thread_cnt_max) {
         // 忙等待其他线程准备好
         BBQ_DBG_LOG("thread init done!");
         sleep(1);
@@ -128,19 +131,16 @@ void *test_thread_producer_start(void *arg) {
     snprintf(thread_name, sizeof(thread_name), "producer:%x", exit_data->thread_id);
     prctl(PR_SET_NAME, thread_name);
 
+    atomic_fetch_add(&cfg->run.thread_start, 1);
     test_wait_all_threads_ready(cfg);
 
     exit_data->metric_start = test_clock_time_get();
     while (true) {
-        if (cfg->run.enq_per_producer > 0 && run_times >= cfg->run.enq_per_producer) {
-            // 控制次数的循环
+        if ((cfg->run.enq_per_producer > 0 && run_times >= cfg->run.enq_per_producer) || (!cfg->run.running)) {
+            // 控制次数的循环或运行时间到了
             break;
         }
 
-        if (!cfg->run.running) {
-            // 控制时间的循环，时间一到生产者退出
-            break;
-        }
         if (cfg->ring.workload == TEST_WORKLOAD_SIMPLE) {
             ret = test_exec_enqueue(q, &(exit_data->simple_data), &op_latency);
         } else {
@@ -179,6 +179,7 @@ void *test_thread_producer_start(void *arg) {
 
     exit_data->op_ok_latency_ns = op_ok_latency_ns;
     exit_data->op_err_latency_ns = op_err_latency_ns;
+    atomic_fetch_add(&cfg->run.producer_exit, 1);
 
     BBQ_DBG_LOG("producer-----> en_ok:%lu", ok_cnt);
     pthread_exit(exit_data);
@@ -202,20 +203,18 @@ void *test_thread_consumer_start(void *arg) {
     snprintf(thread_name, sizeof(thread_name), "consumer:%x", exit_data->thread_id);
     prctl(PR_SET_NAME, thread_name);
 
+    atomic_fetch_add(&cfg->run.thread_start, 1);
     test_wait_all_threads_ready(cfg);
 
     usleep(100);
 
     exit_data->metric_start = test_clock_time_get();
     while (true) {
-        if (cfg->run.deq_per_consumer > 0 && run_times >= cfg->run.deq_per_consumer) {
-            // 控制次数的循环，次数到了
-            break;
-        }
-
-        if (!cfg->run.running) {
-            // 控制时间的循环，时间到
-            break;
+        if ((cfg->run.deq_per_consumer > 0 && run_times >= cfg->run.deq_per_consumer) || (!cfg->run.running)) {
+            // 控制次数的循环或运行时间到了,检查生产者是否全部退出，且队列被消费完了
+            if (ret == BBQ_QUEUE_EMPTY && test_all_producer_exit(cfg)) {
+                break;
+            }
         }
 
         test_data *data = NULL;

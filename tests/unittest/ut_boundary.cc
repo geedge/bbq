@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-02 09:19:01
+ * @LastEditTime: 2024-06-02 12:06:57
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -145,7 +145,7 @@ TEST(boundary, mpsc_faa) {
     test_merge_all_data(exit_data, thread_cnt, &merge);
     EXPECT_EQ(merge.consumer.data_error_cnt, 0);
     EXPECT_EQ(merge.consumer.ok_cnt, merge.producer.ok_cnt);
-    EXPECT_EQ(merge.consumer.run_times, cfg.run.deq_per_consumer * cfg.ring.consumer_cnt);
+    EXPECT_GE(merge.consumer.run_times, cfg.run.deq_per_consumer * cfg.ring.consumer_cnt);
     EXPECT_EQ(merge.producer.run_times, cfg.run.enq_per_producer * cfg.ring.producer_cnt);
 
     // 释放数据
