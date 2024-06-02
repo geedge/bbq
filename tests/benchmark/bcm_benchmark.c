@@ -1,25 +1,25 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-02 12:13:55
+ * @LastEditTime: 2024-06-02 22:05:49
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
-#include "bbq.h"
-#include "bcm_queue.h"
-#include "iniparser.h"
-#include "test_mix.h"
-#include "test_queue.h"
 #include <pthread.h>
 #include <stdatomic.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/prctl.h>
 #include <unistd.h>
+#include "bbq.h"
+#include "bcm_queue.h"
+#include "iniparser.h"
+#include "test_mix.h"
+#include "test_queue.h"
 
 extern void bbq_memory_info();
 extern bool bbq_malloc_free_equal();
 
-void bcm_report_printf(test_cfg *cfg, test_merge_data *data, test_exit_data **raw_data, uint32_t thread_cnt, test_thread_type_e ttype) {
+void bcm_report_printf(test_cfg* cfg, test_merge_data* data, test_exit_data** raw_data, uint32_t thread_cnt, test_thread_type_e ttype) {
     char name[10] = {0};
     double latency_ns = 0;
     double throughput = 0;
@@ -72,7 +72,7 @@ void bcm_report_printf(test_cfg *cfg, test_merge_data *data, test_exit_data **ra
     }
 }
 
-void bcm_report_generate(test_cfg *cfg, test_exit_data **exit_data, uint32_t thread_cnt) {
+void bcm_report_generate(test_cfg* cfg, test_exit_data** exit_data, uint32_t thread_cnt) {
     // test_report report;
 
     test_merge_s merge = {0};
@@ -95,15 +95,16 @@ void bcm_report_generate(test_cfg *cfg, test_exit_data **exit_data, uint32_t thr
 }
 
 #if 1
-int main(int argc, char *argv[]) {
-    char *config;
-    char *ring_type;
+int main(int argc, char* argv[]) {
+    char* config;
+    char* ring_type;
 
     if (argc == 3) {
         config = argv[1];
         ring_type = argv[2];
     } else {
-        config = "/root/code/c/bbq-ly/tests/benchmark/config/bbq_debug/debug.ini";
+        config = "/root/code/c/bbq-ly/tests/benchmark/config/compare/perf/case9_simple_mpmc.ini";
+        // ring_type = "dpdk";
         ring_type = "bbq";
         BBQ_ERR_LOG("use default config, ringt_type:bbq config:%s", config);
     }
@@ -129,7 +130,7 @@ int main(int argc, char *argv[]) {
     }
 
     // 创建线程
-    pthread_t *threads = test_threads_create(&cfg, &q);
+    pthread_t* threads = test_threads_create(&cfg, &q);
     if (threads == NULL) {
         BBQ_ERR_LOG("pthread_arr is NULL");
         return ret;
@@ -140,11 +141,11 @@ int main(int argc, char *argv[]) {
 
     // 等待所有线程完成，回收数据
     uint32_t thread_cnt = cfg.ring.producer_cnt + cfg.ring.consumer_cnt;
-    test_exit_data **exit_data = (test_exit_data **)test_malloc(TEST_MODULE_BCM, sizeof(test_exit_data **) * (thread_cnt));
+    test_exit_data** exit_data = (test_exit_data**)test_malloc(TEST_MODULE_BCM, sizeof(test_exit_data**) * (thread_cnt));
     uint32_t i = 0;
 
     for (i = 0; i < thread_cnt; i++) {
-        pthread_join(threads[i], (void **)(&exit_data[i])); // 等待每个线程结束
+        pthread_join(threads[i], (void**)(&exit_data[i]));  // 等待每个线程结束
     }
 
     // 生成benchmark报告
@@ -173,14 +174,14 @@ int loop_cnt = 30;
 // int test_cnt = 16384;
 // int loop_cnt = 3;
 
-void *pstart(void *arg) {
-    bbq_queue_s *q = (bbq_queue_s *)arg;
+void* pstart(void* arg) {
+    bbq_queue_s* q = (bbq_queue_s*)arg;
 
     int ret = 0;
     uint32_t ok_cnt = 0;
 
     for (int i = 0; i < test_cnt; i++) {
-        int *data = (int *)malloc(sizeof(int));
+        int* data = (int*)malloc(sizeof(int));
         *data = 123;
         ret = bbq_enqueue(q, data);
         if (ret == 0) {
@@ -195,14 +196,14 @@ void *pstart(void *arg) {
     printf("------------------------------p ok_cnt:%u\n", ok_cnt);
 }
 
-void *cstart(void *arg) {
-    bbq_queue_s *q = (bbq_queue_s *)arg;
-    int *data;
+void* cstart(void* arg) {
+    bbq_queue_s* q = (bbq_queue_s*)arg;
+    int* data;
     int ret = 0;
     uint32_t ok_cnt = 0;
 
     for (int i = 0; i < test_cnt; i++) {
-        ret = bbq_dequeue(q, (void **)&data);
+        ret = bbq_dequeue(q, (void**)&data);
         if (ret == 0) {
             if (*data != 123) {
                 printf(".........!!!!!!!!  *data !=123,  is :%d\n", *data);
@@ -221,7 +222,7 @@ void *cstart(void *arg) {
 
 int main() {
 #define TCNT 10
-    bbq_queue_s *q = bbq_ring_create_bnbs_with_socket("bbq_ring", bn, bs, -1, BBQ_RETRY_NEW);
+    bbq_queue_s* q = bbq_ring_create_bnbs_with_socket("bbq_ring", bn, bs, -1, BBQ_RETRY_NEW);
     if (q == NULL) {
         BBQ_ERR_LOG("bbq_ring_create_with_socket failed");
         return BBQ_NULL_PTR;
