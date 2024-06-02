@@ -1,7 +1,7 @@
 /*
  * @Description: 描述信息
  * @Date: 2024-05-25 10:55:48
- * @LastEditTime: 2024-05-31 11:25:32
+ * @LastEditTime: 2024-06-01 01:14:07
  */
 
 #include "test_mix.h"
@@ -51,6 +51,10 @@ bool test_malloc_free_equal() {
         }
     }
     return ret;
+}
+
+void test_memory_counter_clear() {
+    memset(test_memory_g, 0, sizeof(test_memory_g));
 }
 
 void test_memory_info() {

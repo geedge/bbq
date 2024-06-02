@@ -125,7 +125,7 @@ int main(int argc, char *argv[]) {
     }
 
     // 创建线程
-    pthread_t *threads = test_threads_creat(&cfg, &q);
+    pthread_t *threads = test_threads_create(&cfg, &q);
     if (threads == NULL) {
         BBQ_ERR_LOG("pthread_arr is NULL");
         return ret;

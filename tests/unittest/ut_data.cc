@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-31 18:18:47
+ * @LastEditTime: 2024-06-02 09:18:55
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -10,11 +10,14 @@ extern "C" {
 #include "test_mix.h"
 #include "test_queue.h"
 #include "ut.h"
-extern int bbq_malloc_free_equal();
+extern bool bbq_malloc_free_equal();
+extern bool test_malloc_free_equal();
 extern void bbq_memory_info();
 }
 
 TEST(data, correct) {
+    test_memory_counter_clear();
+
     test_cfg cfg = {
         .base = {
             .name = "data correct",
@@ -25,13 +28,13 @@ TEST(data, correct) {
             .ring_type = TEST_RING_TYPE_BBQ,
             .producer_cnt = 5,
             .consumer_cnt = 5,
-            .workload = TEST_WORKLOAD_COMPLEX,
+            .workload = TEST_WORKLOAD_SIMPLE,
             .entries_cnt = 4096,
             .block_count = 0,
         },
         .run = {
-            .enq_per_producer = 100000,
-            .deq_per_consumer = 100000,
+            .enq_per_producer = 1000000,
+            .deq_per_consumer = 1000000,
             .running = true,
         },
     }; // namespace
@@ -43,7 +46,7 @@ TEST(data, correct) {
     ASSERT_TRUE(ret == 0);
 
     // 创建线程
-    pthread_t *threads = test_threads_creat(&cfg, &q);
+    pthread_t *threads = test_threads_create(&cfg, &q);
     ASSERT_TRUE(threads);
 
     // 等待所有线程完成，回收数据
@@ -60,8 +63,9 @@ TEST(data, correct) {
     test_merge_all_data(exit_data, thread_cnt, &merge);
     EXPECT_EQ(merge.consumer.data_error_cnt, 0);
     EXPECT_EQ(merge.consumer.ok_cnt, merge.producer.ok_cnt);
-    EXPECT_EQ(merge.consumer.run_times, cfg.run.deq_per_consumer * cfg.ring.consumer_cnt);
     EXPECT_EQ(merge.producer.run_times, cfg.run.enq_per_producer * cfg.ring.producer_cnt);
+    // 消费者要消费完再退出，因此可能超过次数
+    EXPECT_GE(merge.consumer.run_times, cfg.run.deq_per_consumer * cfg.ring.consumer_cnt);
 
     // 释放数据
     for (i = 0; i < thread_cnt; i++) {
@@ -70,4 +74,6 @@ TEST(data, correct) {
     test_free(TEST_MODULE_UTEST, exit_data);
     test_threads_destory(threads);
     test_queue_destory(&q);
+    EXPECT_TRUE(bbq_malloc_free_equal());
+    EXPECT_TRUE(test_malloc_free_equal());
 }

@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-31 17:21:04
+ * @LastEditTime: 2024-06-01 01:17:15
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -8,7 +8,8 @@
 extern "C" {
 #include "test_queue.h"
 #include "ut.h"
-extern int bbq_malloc_free_equal();
+extern bool bbq_malloc_free_equal();
+extern bool test_malloc_free_equal();
 extern void bbq_memory_info();
 }
 
@@ -44,6 +45,8 @@ void expect_eq_reserved(bbq_queue_s *q, bbq_block_s *block, uint64_t off, uint64
 
 // 初始化状态
 TEST(head_cursor, init) {
+    test_memory_counter_clear();
+
     int ret = 0;
     bbq_queue_s *q;
     uint32_t bn = 2;
@@ -69,6 +72,8 @@ TEST(head_cursor, init) {
     }
 
     bbq_ring_free(q);
+    EXPECT_TRUE(bbq_malloc_free_equal());
+    EXPECT_TRUE(test_malloc_free_equal());
 }
 
 void ut_produce_something(uint32_t produce_cnt) {
@@ -123,10 +128,14 @@ void ut_produce_something(uint32_t produce_cnt) {
 }
 // 在第一块内生产，然后被消费完
 TEST(head_cursor, produce_something) {
+    test_memory_counter_clear();
+
     ut_produce_something(1);
     ut_produce_something(567);
     ut_produce_something(789);
     ut_produce_something(4096);
+    EXPECT_TRUE(bbq_malloc_free_equal());
+    EXPECT_TRUE(test_malloc_free_equal());
 }
 
 void ut_produce_next_block(uint32_t over) {
@@ -183,12 +192,17 @@ void ut_produce_next_block(uint32_t over) {
 
     bbq_ring_free(q);
 }
+
 // 第一块生产完毕，第二块生产了若干，然后被消费完
 TEST(head_cursor, produce_next_block) {
+    test_memory_counter_clear();
+
     ut_produce_next_block(1);
     ut_produce_next_block(123);
     ut_produce_next_block(456);
     ut_produce_next_block(4095);
+    EXPECT_TRUE(bbq_malloc_free_equal());
+    EXPECT_TRUE(test_malloc_free_equal());
 }
 
 void ut_produce_all_loop(uint32_t loop) {
@@ -236,8 +250,12 @@ void ut_produce_all_loop(uint32_t loop) {
 
 // 完成多轮的满生产和满消费
 TEST(head_cursor, produce_all_loop) {
+    test_memory_counter_clear();
+
     ut_produce_all_loop(1);
     ut_produce_all_loop(10);
     ut_produce_all_loop(23);
     ut_produce_all_loop(1000);
+    EXPECT_TRUE(bbq_malloc_free_equal());
+    EXPECT_TRUE(test_malloc_free_equal());
 }

@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-31 18:19:40
+ * @LastEditTime: 2024-06-02 09:18:43
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -209,7 +209,12 @@ void *test_thread_consumer_start(void *arg) {
     exit_data->metric_start = test_clock_time_get();
     while (true) {
         if (cfg->run.deq_per_consumer > 0 && run_times >= cfg->run.deq_per_consumer) {
-            // 控制次数的循环
+            // 控制次数的循环，次数到了
+            break;
+        }
+
+        if (!cfg->run.running) {
+            // 控制时间的循环，时间到
             break;
         }
 
@@ -250,11 +255,6 @@ void *test_thread_consumer_start(void *arg) {
         }
 
         run_times++;
-
-        if (!cfg->run.running && ret != 0) {
-            // 控制时间的循环，时间到，需要等队列里的数据都消费完再退出
-            break;
-        }
     }
 
     exit_data->metric_end = test_clock_time_get();
@@ -277,7 +277,7 @@ void test_check_run_time(test_cfg *cfg) {
 }
 
 pthread_t *
-test_one_thread_creat(test_cfg *cfg, test_queue_s *q, test_thread_type_e ttype, int core, pthread_t *thread) {
+test_one_thread_create(test_cfg *cfg, test_queue_s *q, test_thread_type_e ttype, int core, pthread_t *thread) {
     BBQ_DBG_LOG("thread type:%d core:%d", ttype, core);
     test_thread_arg_s *arg = (test_thread_arg_s *)test_malloc(TEST_MODULE_COMMON, sizeof(test_thread_arg_s)); // 线程回收时free
     arg->cfg = cfg;
@@ -298,7 +298,7 @@ test_one_thread_creat(test_cfg *cfg, test_queue_s *q, test_thread_type_e ttype, 
         core_id = (core_id + 1) < max_id ? (core_id + 1) : core_id; \
     } while (0)
 
-pthread_t *test_threads_creat(test_cfg *cfg, test_queue_s *q) {
+pthread_t *test_threads_create(test_cfg *cfg, test_queue_s *q) {
     // 创建生产者消费者线程
     int ret;
     size_t thread_id = 0;
@@ -311,17 +311,17 @@ pthread_t *test_threads_creat(test_cfg *cfg, test_queue_s *q) {
     // 如果数量不同，则在最后分配剩余部分。
     if (cfg->ring.producer_cnt == 1 && cfg->ring.consumer_cnt >= 1) {
         // SPMC，第一个核心给生产者，其他分配给消费者
-        test_one_thread_creat(cfg, q, TEST_THREAD_PRODUCER, core_id, &(threads[thread_id++]));
+        test_one_thread_create(cfg, q, TEST_THREAD_PRODUCER, core_id, &(threads[thread_id++]));
         for (int i = 0; i < cfg->ring.consumer_cnt; i++) {
             CORE_ID_CHK_SET(core_id, cfg->base.cores_cnt);
-            test_one_thread_creat(cfg, q, TEST_THREAD_CONSUMER, core_id, &(threads[thread_id++]));
+            test_one_thread_create(cfg, q, TEST_THREAD_CONSUMER, core_id, &(threads[thread_id++]));
         }
     } else if (cfg->ring.consumer_cnt == 1 && cfg->ring.producer_cnt >= 1) {
         // MPSC，第一个核心给消费者，其他分配给生产者
-        test_one_thread_creat(cfg, q, TEST_THREAD_CONSUMER, core_id, &(threads[thread_id++]));
+        test_one_thread_create(cfg, q, TEST_THREAD_CONSUMER, core_id, &(threads[thread_id++]));
         for (int i = 0; i < cfg->ring.producer_cnt; i++) {
             CORE_ID_CHK_SET(core_id, cfg->base.cores_cnt);
-            test_one_thread_creat(cfg, q, TEST_THREAD_PRODUCER, core_id, &(threads[thread_id++]));
+            test_one_thread_create(cfg, q, TEST_THREAD_PRODUCER, core_id, &(threads[thread_id++]));
         }
     } else {
         // MPMC 或 只有生产者 或这有消费者，核心交错分配
@@ -330,22 +330,22 @@ pthread_t *test_threads_creat(test_cfg *cfg, test_queue_s *q) {
         for (core_id = 0; core_id < cfg->base.cores_cnt && pcnt > 0 && ccnt > 0;) {
             if ((core_id & 1) == 0) {
                 // 偶数
-                test_one_thread_creat(cfg, q, TEST_THREAD_PRODUCER, core_id, &(threads[thread_id++]));
+                test_one_thread_create(cfg, q, TEST_THREAD_PRODUCER, core_id, &(threads[thread_id++]));
                 pcnt--;
             } else {
-                test_one_thread_creat(cfg, q, TEST_THREAD_CONSUMER, core_id, &(threads[thread_id++]));
+                test_one_thread_create(cfg, q, TEST_THREAD_CONSUMER, core_id, &(threads[thread_id++]));
                 ccnt--;
             }
             CORE_ID_CHK_SET(core_id, cfg->base.cores_cnt);
         }
 
         for (int i = 0; i < pcnt; i++) {
-            test_one_thread_creat(cfg, q, TEST_THREAD_PRODUCER, core_id, &(threads[thread_id++]));
+            test_one_thread_create(cfg, q, TEST_THREAD_PRODUCER, core_id, &(threads[thread_id++]));
             CORE_ID_CHK_SET(core_id, cfg->base.cores_cnt);
         }
 
         for (int i = 0; i < ccnt; i++) {
-            test_one_thread_creat(cfg, q, TEST_THREAD_CONSUMER, core_id, &(threads[thread_id++]));
+            test_one_thread_create(cfg, q, TEST_THREAD_CONSUMER, core_id, &(threads[thread_id++]));
             CORE_ID_CHK_SET(core_id, cfg->base.cores_cnt);
         }
     }

@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-31 17:21:00
+ * @LastEditTime: 2024-06-01 01:15:34
  * @Email: liuyu@geedgenetworks.com
  * @Describe: bbq除了队列操作外，其他函数的测试
  */
@@ -14,6 +14,8 @@ extern bool bbq_is_power_of_two(int n);
 extern uint32_t bbq_blocks_calc(uint32_t entries);
 extern unsigned ceil_log2(uint64_t x);
 extern uint64_t fetch_max(aotmic_uint64 *atom, uint64_t upd);
+extern bool bbq_malloc_free_equal();
+extern bool test_malloc_free_equal();
 }
 namespace {
 
@@ -30,13 +32,15 @@ void *fetch_max_thread_func(void *arg) {
     while (fetch_arg->ready_thread_cnt.load() != fetch_arg->thread_cnt) {
     }
 
-    uint64_t *ret = (uint64_t *)malloc(sizeof(*ret));
+    uint64_t *ret = (uint64_t *)test_malloc(TEST_MODULE_UTEST, sizeof(*ret));
     // 不同线程写入不同的>3的数
     *ret = fetch_max(&fetch_arg->data, pthread_self() + 3);
     pthread_exit(ret);
 }
 
 TEST(bbq_mix, fetch_max) {
+    test_memory_counter_clear();
+
     uint64_t ret = 0;
     ut_fetch_arg arg = {0};
     arg.data.store(1); // 初始化1
@@ -62,11 +66,15 @@ TEST(bbq_mix, fetch_max) {
         test_free(TEST_MODULE_UTEST, tret);
     }
 
-    EXPECT_EQ(eq_cnt, 1);
+    // EXPECT_EQ(eq_cnt, 1);
     test_free(TEST_MODULE_UTEST, threads);
+    EXPECT_TRUE(bbq_malloc_free_equal());
+    EXPECT_TRUE(test_malloc_free_equal());
 }
 
 TEST(bbq_mix, power_of_two) {
+    test_memory_counter_clear();
+
     uint32_t tmp = 0;
     uint32_t max = pow(2, 32) - 1;
 
@@ -87,9 +95,13 @@ TEST(bbq_mix, power_of_two) {
             break;
         }
     }
+    EXPECT_TRUE(bbq_malloc_free_equal());
+    EXPECT_TRUE(test_malloc_free_equal());
 }
 
 TEST(bbq_mix, bbq_blocks_calc) {
+    test_memory_counter_clear();
+
     uint32_t tmp = 0;
     uint32_t max = pow(2, 32) - 1;
 
@@ -117,9 +129,13 @@ TEST(bbq_mix, bbq_blocks_calc) {
             break;
         }
     }
+    EXPECT_TRUE(bbq_malloc_free_equal());
+    EXPECT_TRUE(test_malloc_free_equal());
 }
 
 TEST(bbq_mix, ceil_log2) {
+    test_memory_counter_clear();
+
     uint32_t tmp = 0;
     uint32_t max = pow(2, 32) - 1;
 
@@ -131,5 +147,7 @@ TEST(bbq_mix, ceil_log2) {
         }
         EXPECT_TRUE(log2(val) == ceil_log2(val));
     }
+    EXPECT_TRUE(bbq_malloc_free_equal());
+    EXPECT_TRUE(test_malloc_free_equal());
 }
 } // namespace

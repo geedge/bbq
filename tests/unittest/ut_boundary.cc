@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-31 18:18:41
+ * @LastEditTime: 2024-06-02 09:19:01
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -11,7 +11,8 @@
 extern "C" {
 #include "test_queue.h"
 #include "ut.h"
-extern int bbq_malloc_free_equal();
+extern bool bbq_malloc_free_equal();
+extern bool test_malloc_free_equal();
 extern void bbq_memory_info();
 }
 
@@ -31,6 +32,7 @@ extern bool utest_thread_exit_merge_data_compare(thread_data_s *merge_pdata, thr
 extern void utest_thread_exit_merge_counter(thread_data_s *data_arr, thread_data_s *data);
 
 TEST(boundary, full_empty) {
+    test_memory_counter_clear();
     int ret = 0;
     uint32_t entries_cnt = 4096;
     uint32_t loop = 1000;
@@ -91,9 +93,13 @@ TEST(boundary, full_empty) {
 
     test_free(TEST_MODULE_UTEST, data);
     bbq_ring_free(q);
+    EXPECT_TRUE(bbq_malloc_free_equal());
+    EXPECT_TRUE(test_malloc_free_equal());
 }
 
 TEST(boundary, mpsc_faa) {
+    test_memory_counter_clear();
+
     test_cfg cfg = {
         .base = {
             .name = "mpsc_faa",
@@ -122,7 +128,7 @@ TEST(boundary, mpsc_faa) {
     ASSERT_TRUE(ret == 0);
 
     // 创建线程
-    pthread_t *threads = test_threads_creat(&cfg, &q);
+    pthread_t *threads = test_threads_create(&cfg, &q);
     ASSERT_TRUE(threads);
 
     // 等待所有线程完成，回收数据
@@ -149,5 +155,7 @@ TEST(boundary, mpsc_faa) {
     test_free(TEST_MODULE_UTEST, exit_data);
     test_threads_destory(threads);
     test_queue_destory(&q);
+    EXPECT_TRUE(bbq_malloc_free_equal());
+    EXPECT_TRUE(test_malloc_free_equal());
 }
 } // namespace

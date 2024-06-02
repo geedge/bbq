@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-31 17:32:50
+ * @LastEditTime: 2024-06-01 01:14:47
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -105,4 +105,5 @@ extern void *test_malloc(test_module_e module, size_t size);
 extern void *test_calloc(test_module_e module, size_t size);
 extern void test_free(test_module_e module, void *ptr);
 extern void test_memory_info();
+extern void test_memory_counter_clear();
 #endif

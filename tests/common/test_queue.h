@@ -73,8 +73,8 @@ typedef struct {
 } test_merge_s;
 
 extern void test_threads_destory(pthread_t *threads);
-extern pthread_t *test_threads_creat(test_cfg *cfg, test_queue_s *q);
-extern pthread_t *test_one_thread_creat(test_cfg *cfg, test_queue_s *q, test_thread_type_e ttype, int core, pthread_t *thread);
+extern pthread_t *test_threads_create(test_cfg *cfg, test_queue_s *q);
+extern pthread_t *test_one_thread_create(test_cfg *cfg, test_queue_s *q, test_thread_type_e ttype, int core, pthread_t *thread);
 extern void test_check_run_time(test_cfg *cfg);
 extern void *test_thread_consumer_start(void *arg);
 extern void *test_thread_producer_start(void *arg);

@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-31 14:22:34
+ * @LastEditTime: 2024-06-01 01:07:34
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -533,7 +533,6 @@ bool bbq_malloc_free_equal() {
     }
     return ret;
 #else
-    BBQ_INFO_LOG("BBQ_MEMORY is not define");
     return true;
 #endif
 }
