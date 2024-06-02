@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu@geedgenetworks.com
- * @LastEditTime: 2024-06-02 22:00:56
+ * @LastEditTime: 2024-06-02 22:09:26
  * @Describe:
  */
 
@@ -13,7 +13,7 @@
 #include <stdlib.h>
 
 // #define BBQ_MEMORY
-#define BBQ_DEBUG
+// #define BBQ_DEBUG
 
 #ifndef __cplusplus
 // C

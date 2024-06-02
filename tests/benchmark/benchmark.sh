@@ -1,7 +1,7 @@
 #!/bin/bash
 ###
 # @Author: liuyu
-# @LastEditTime: 2024-05-28 10:47:54
+ # @LastEditTime: 2024-06-03 01:48:19
 # @Email: liuyu@geedgenetworks.com
 # @Describe: TODO
 ###
@@ -20,6 +20,19 @@ BENCHMARK_PATH=$1
 CONFIG_DIR=$2
 RING_TYPE=$3
 
+function exec_benchmark_ring_type() {
+    local ini="$1"
+    local ring="$2"
+
+    # 如果以perf开头的配置文件，还要执行perf统计
+    if [[ $(basename "$ini") == perf* ]]; then
+        echo "perf stat -a -e L1-dcache-loads,L1-dcache-load-misses,cache-references,cache-misses "$BENCHMARK_PATH" "$ini" "$ring""
+        perf stat -a -e L1-dcache-loads,L1-dcache-load-misses,cache-references,cache-misses "$BENCHMARK_PATH" "$ini" "$ring"
+    else
+        "$BENCHMARK_PATH" "$ini" "$ring"
+    fi
+}
+
 function exec_benchmark() {
     # 提取配置文件名（不带路径）
     INI_FILE=$1
@@ -29,11 +42,12 @@ function exec_benchmark() {
 
     # 使用所有ring_type
     if [ "$RING_TYPE" == "all" ]; then
-        for ring_type in "${ring_type_arr[@]}"; do
-            "$BENCHMARK_PATH" "$INI_FILE" "$ring_type"
+        for ring_type_tmp in "${ring_type_arr[@]}"; do
+            exec_benchmark_ring_type "$INI_FILE" "$ring_type_tmp"
+            echo "--------------------------------------------------------------"
         done
     else
-        "$BENCHMARK_PATH" "$INI_FILE" "$RING_TYPE"
+        exec_benchmark_ring_type "$INI_FILE" "$RING_TYPE"
     fi
 }
 
@@ -50,7 +64,7 @@ if [ ! -e "$CONFIG_DIR" ]; then
 fi
 
 if [[ -f "$CONFIG_DIR" ]]; then
-    # 如果是文件，直接加入数组
+    # 如果是文件，直接执行
     exec_benchmark $CONFIG_DIR
 else
     # 使用 find 命令递归地搜索所有的 .ini 文件，并按文件名排序
@@ -60,27 +74,5 @@ else
         fi
     done
 fi
-
-# # 使用 find 命令递归地搜索所有的 .ini 文件，并按文件名排序
-# find "$CONFIG_DIR" -type f -name "*.ini" -print0 | sort -z | while IFS= read -r -d '' INI_FILE; do
-#     if [ -f "$INI_FILE" ]; then
-#         # 提取配置文件名（不带路径）
-#         INI_FILENAME=$(basename "$INI_FILE")
-
-#         # 执行benchmark命令并传递配置文件作为参数
-#         echo "Executing benchmark with $INI_FILENAME"
-
-#         # 使用所有ring_type
-#         if [ "$3" == "all" ]; then
-#             for ring_type in "${ring_type_arr[@]}"; do
-#                 "$BENCHMARK_PATH" "$INI_FILE" "$ring_type"
-#             done
-#         else
-#             "$BENCHMARK_PATH" "$INI_FILE" "$3"
-#         fi
-#     else
-#         echo "Warning: '$INI_FILE' is not a regular file, skipping."
-#     fi
-# done
 
 echo "done......."
