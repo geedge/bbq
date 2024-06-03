@@ -10,7 +10,7 @@ extern "C" {
 #include "test_mix.h"
 #include "ut.h"
 #include <math.h>
-extern bool bbq_is_power_of_two(int n);
+extern bool bbq_check_power_of_two(int n);
 extern uint32_t bbq_blocks_calc(uint32_t entries);
 extern unsigned ceil_log2(uint64_t x);
 extern uint64_t fetch_max(aotmic_uint64 *atom, uint64_t upd);
@@ -78,11 +78,11 @@ TEST(bbq_mix, power_of_two) {
     uint32_t tmp = 0;
     uint32_t max = pow(2, 32) - 1;
 
-    EXPECT_FALSE(bbq_is_power_of_two(0));
+    EXPECT_FALSE(bbq_check_power_of_two(0));
 
     tmp = 3;
     for (uint32_t val = 5; val < max; val *= tmp) {
-        EXPECT_FALSE(bbq_is_power_of_two(val));
+        EXPECT_FALSE(bbq_check_power_of_two(val));
         if (val >= max / tmp) {
             break; // 即将越界
         }
@@ -90,7 +90,7 @@ TEST(bbq_mix, power_of_two) {
 
     tmp = 2;
     for (uint32_t val = 1; val < max; val *= tmp) {
-        EXPECT_TRUE(bbq_is_power_of_two(val));
+        EXPECT_TRUE(bbq_check_power_of_two(val));
         if (val >= max / tmp) {
             break;
         }

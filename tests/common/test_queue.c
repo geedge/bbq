@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-03 09:47:08
+ * @LastEditTime: 2024-06-03 21:27:50
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -22,9 +22,9 @@ int test_queue_init_bbq(test_cfg *cfg, test_queue_s *q) {
     bbq_queue_s *ring;
 
     if (cfg->ring.block_count == 0) {
-        q->ring = bbq_ring_create_with_socket("bbq_ring", cfg->ring.entries_cnt, 0, NULL);
+        q->ring = bbq_ring_create_with_socket(cfg->ring.entries_cnt, 0, NULL);
     } else {
-        q->ring = bbq_ring_create_bnbs_with_socket("bbq_ring", cfg->ring.block_count,
+        q->ring = bbq_ring_create_bnbs_with_socket(cfg->ring.block_count,
                                                    cfg->ring.entries_cnt / cfg->ring.block_count,
                                                    0, NULL);
     }

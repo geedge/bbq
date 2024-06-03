@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-31 18:16:51
+ * @LastEditTime: 2024-06-03 22:14:27
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -87,4 +87,8 @@ extern void test_queue_destory(test_queue_s *q);
 extern int test_queue_init_bbq(test_cfg *cfg, test_queue_s *q);
 extern void test_merge_all_data(test_exit_data **exit_data, uint32_t thread_cnt, test_merge_s *merge);
 
+extern uint64_t bbq_idx(bbq_queue_s *q, uint64_t x);
+extern uint64_t bbq_off(bbq_queue_s *q, uint64_t x);
+extern uint64_t bbq_head_vsn(bbq_queue_s *q, uint64_t x);
+extern uint64_t bbq_cur_vsn(bbq_queue_s *q, uint64_t x);
 #endif
