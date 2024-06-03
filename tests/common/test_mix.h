@@ -108,4 +108,5 @@ extern void *test_calloc(test_module_e module, size_t size);
 extern void test_free(test_module_e module, void *ptr);
 extern void test_memory_info();
 extern void test_memory_counter_clear();
+extern bool test_malloc_free_equal();
 #endif
