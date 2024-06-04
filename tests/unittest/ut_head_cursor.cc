@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-04 15:21:25
+ * @LastEditTime: 2024-06-04 18:17:17
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -52,7 +52,7 @@ TEST(head_cursor, init) {
     uint32_t bs = 4;
     int enqueue_data = TEST_DATA_MAGIC;
 
-    q = bbq_ring_create_bnbs(bn, bs, BBQ_RETRY_NEW);
+    q = bbq_ring_create_bnbs(bn, bs, sizeof(void *), BBQ_RETRY_NEW);
     EXPECT_TRUE(q);
 
     // 1.初始化状态,除了第一个block外其他块的4个游标都指向最后一个条目
@@ -86,7 +86,7 @@ void ut_produce_something(uint32_t produce_cnt) {
     EXPECT_GT(produce_cnt, 0);
     EXPECT_LE(produce_cnt, bs);
 
-    q = bbq_ring_create_bnbs(bn, bs, BBQ_RETRY_NEW);
+    q = bbq_ring_create_bnbs(bn, bs, sizeof(void *), BBQ_RETRY_NEW);
     EXPECT_TRUE(q);
 
     // 生产produce_cnt
@@ -149,7 +149,7 @@ void ut_produce_next_block(uint32_t over) {
     EXPECT_GT(over, 0);
     EXPECT_LT(over, bs);
 
-    q = bbq_ring_create_bnbs(bn, bs, BBQ_RETRY_NEW);
+    q = bbq_ring_create_bnbs(bn, bs, sizeof(void *), BBQ_RETRY_NEW);
     EXPECT_TRUE(q);
 
     // 生产至第二块的第一个entry
@@ -213,7 +213,7 @@ void ut_produce_all_loop(uint32_t loop) {
     int enqueue_data = TEST_DATA_MAGIC;
     int *dequeue_data = NULL;
 
-    q = bbq_ring_create_bnbs(bn, bs, BBQ_RETRY_NEW);
+    q = bbq_ring_create_bnbs(bn, bs, sizeof(void *), BBQ_RETRY_NEW);
     EXPECT_TRUE(q);
 
     for (uint32_t cnt = 0; cnt < loop; cnt++) {
@@ -270,7 +270,7 @@ TEST(boundary, retry_new_full_empty) {
     void *tmp_data = NULL;
     EXPECT_TRUE(data);
 
-    q = bbq_ring_create(entries_cnt, BBQ_RETRY_NEW);
+    q = bbq_ring_create(entries_cnt, sizeof(void *), BBQ_RETRY_NEW);
     EXPECT_TRUE(q);
 
     for (uint32_t i = 0; i < loop; i++) {
@@ -411,7 +411,7 @@ TEST(boundary, drop_old_full_empty1) {
     bbq_queue_s *q;
 
     void *tmp_data = NULL;
-    q = bbq_ring_create_bnbs(bn, bs, BBQ_DROP_OLD);
+    q = bbq_ring_create_bnbs(bn, bs, sizeof(void *), BBQ_DROP_OLD);
     EXPECT_TRUE(q);
 
     for (uint32_t j = 0; j < loop; j++) {
@@ -466,7 +466,7 @@ TEST(boundary, drop_old_full_empty2) {
     EXPECT_EQ(over_cnt / bs, 1);
 
     void *tmp_data = NULL;
-    q = bbq_ring_create_bnbs(bn, bs, BBQ_DROP_OLD);
+    q = bbq_ring_create_bnbs(bn, bs, sizeof(void *), BBQ_DROP_OLD);
     EXPECT_TRUE(q);
 
     // 入满队列，再入over_cnt

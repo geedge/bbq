@@ -91,6 +91,7 @@
         "numa.h": "c",
         "test_mix.h": "c",
         "test_queue.h": "c",
-        "prctl.h": "c"
+        "prctl.h": "c",
+        "types.h": "c"
     }
 }

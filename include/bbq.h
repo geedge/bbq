@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu@geedgenetworks.com
- * @LastEditTime: 2024-06-04 15:20:56
+ * @LastEditTime: 2024-06-04 18:14:18
  * @Describe: bbq（Block-based Bounded Queue）头文件
  * 参考：https://www.usenix.org/system/files/atc22-wang-jiawei.pdf
  */
@@ -77,8 +77,9 @@ typedef void (*drop_old_func)(void *arg);
 typedef struct {
     int socket_id; // 在哪个socket_id上使用libnuma分配内存，-1表示无效，使用malloc分配
     bbq_policy_e policy;
-    size_t bs; // 每个block里entries成员的大小
-    size_t bn; // blocks个数
+    size_t bs;       // 每个block里entries成员的大小
+    size_t bn;       // blocks个数
+    size_t obj_size; // 队列成员的大小
     unsigned idx_bits;
     unsigned off_bits;
     uint64_t idx_mask;
@@ -111,10 +112,10 @@ typedef struct {
  * 非NULL：消息队列结构体指针，用于后续出队入队等操作。
  * NULL：创建失败。
  */
-extern bbq_queue_s *bbq_ring_create(uint32_t count, bbq_policy_e policy);
-extern bbq_queue_s *bbq_ring_create_with_socket(uint32_t count, int socket_id, bbq_policy_e policy);
-extern bbq_queue_s *bbq_ring_create_bnbs(uint32_t bn, uint32_t bs, bbq_policy_e policy);
-extern bbq_queue_s *bbq_ring_create_bnbs_with_socket(uint32_t bn, uint32_t bs, int socket_id, bbq_policy_e policy);
+extern bbq_queue_s *bbq_ring_create(uint32_t count, size_t obj_size, bbq_policy_e policy);
+extern bbq_queue_s *bbq_ring_create_with_socket(uint32_t count, size_t obj_size, int socket_id, bbq_policy_e policy);
+extern bbq_queue_s *bbq_ring_create_bnbs(uint32_t bn, uint32_t bs, size_t obj_size, bbq_policy_e policy);
+extern bbq_queue_s *bbq_ring_create_bnbs_with_socket(uint32_t bn, uint32_t bs, size_t obj_size, int socket_id, bbq_policy_e policy);
 
 /**
  * 用于释放消息队列，与bbq_ring_create系列函数成对。
