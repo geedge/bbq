@@ -1,10 +1,16 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-05-31 10:52:23
+ * @LastEditTime: 2024-06-04 23:18:03
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
 #include "bcm_queue.h"
+
+static __rte_always_inline int
+bcm_dpdk_ring_enqueue(struct rte_ring *r, void *obj) {
+    test_data **tmp_data = (test_data **)obj;
+    return rte_ring_enqueue(r, *tmp_data);
+}
 
 int test_queue_init_dpdk(test_cfg *cfg, test_queue_s *q) {
     char *argv[1] = {"bcm_dpdk"};
@@ -34,7 +40,7 @@ int test_queue_init_dpdk(test_cfg *cfg, test_queue_s *q) {
     }
 
     q->ring_free_f = (test_ring_free_f)rte_ring_free;
-    q->enqueue_f = (test_ring_enqueue_f)rte_ring_enqueue;
+    q->enqueue_f = (test_ring_enqueue_f)bcm_dpdk_ring_enqueue;
     q->dequeue_f = (test_ring_dequeue_f)rte_ring_dequeue;
 
     return BBQ_OK;
