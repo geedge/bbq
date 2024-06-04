@@ -1,7 +1,7 @@
 /*
  * @Description: 描述信息
  * @Date: 2024-05-25 10:55:48
- * @LastEditTime: 2024-06-04 15:27:04
+ * @LastEditTime: 2024-06-04 21:15:55
  */
 
 #include "test_mix.h"
@@ -222,18 +222,18 @@ char *test_ring_type_enum2str(test_ring_type ring_type) {
     }
 }
 
-void **test_table_create(uint32_t count) {
-    void **table = test_malloc(TEST_MODULE_TABLE, sizeof(void **) * count);
-    memset(table, 0, sizeof(void **) * count);
+uint16_t **test_table_create(uint32_t count) {
+    uint16_t **table = test_malloc(TEST_MODULE_TABLE, sizeof(int **) * count);
+    memset(table, 0, sizeof(int **) * count);
     return table;
 }
 
-void test_table_destory(void **table) {
+void test_table_destory(uint16_t **table) {
     test_free(TEST_MODULE_TABLE, table);
 }
 
-void **test_enqueue_table_create(uint32_t count) {
-    void **table = test_table_create(count);
+uint16_t **test_enqueue_table_create(uint32_t count) {
+    uint16_t **table = test_table_create(count);
     if (table == NULL) {
         return NULL;
     }
@@ -262,7 +262,7 @@ error:
     return NULL;
 }
 
-void test_enqueue_table_destory(void **table, uint32_t count) {
+void test_enqueue_table_destory(uint16_t **table, uint32_t count) {
     if (table == NULL) {
         return;
     }

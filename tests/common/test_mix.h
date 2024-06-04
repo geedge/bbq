@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-04 10:40:33
+ * @LastEditTime: 2024-06-04 21:16:01
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -113,8 +113,8 @@ extern void test_free(test_module_e module, void *ptr);
 extern void test_memory_info();
 extern void test_memory_counter_clear();
 extern bool test_malloc_free_equal();
-extern void **test_enqueue_table_create(uint32_t count);
-extern void test_enqueue_table_destory(void **table, uint32_t count);
-extern void **test_table_create(uint32_t count);
-extern void test_table_destory(void **table);
+extern uint16_t **test_enqueue_table_create(uint32_t count);
+extern void test_enqueue_table_destory(uint16_t **table, uint32_t count);
+extern uint16_t **test_table_create(uint32_t count);
+extern void test_table_destory(uint16_t **table);
 #endif

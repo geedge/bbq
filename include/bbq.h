@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu@geedgenetworks.com
- * @LastEditTime: 2024-06-04 18:14:18
+ * @LastEditTime: 2024-06-04 21:56:33
  * @Describe: bbq（Block-based Bounded Queue）头文件
  * 参考：https://www.usenix.org/system/files/atc22-wang-jiawei.pdf
  */
@@ -28,15 +28,12 @@ using bbq_head = std::atomic<uint64_t>;
 using aotmic_uint64 = std::atomic<uint64_t>;
 #endif
 
-typedef void *bbq_data;
-
 typedef struct {
     bbq_cursor committed; // 已提交（version|offset）
     bbq_cursor allocated; // 已分配（version|offset）
     bbq_cursor reserved;  // 已预留（version|offset）
     bbq_cursor consumed;  // 已消费（version|offset）， 在drop-old模式下没用
-
-    bbq_data *entries; // BS大小的动态数组
+    char *entries;        // BS大小的动态数组
 } bbq_block_s;
 
 typedef enum {
@@ -61,11 +58,6 @@ typedef struct {
         bbq_entry_desc_s e; // state为ALLOCATED、RESERVED生效
     };
 } bbq_queue_state_s;
-
-typedef struct {
-    int status;    // 操作返回值
-    bbq_data data; // OKAY时生效，指向入队/出队的数据
-} bbq_queue_status_s;
 
 typedef enum {
     BBQ_DROP_OLD, // 入队时队列满了，则覆盖旧的entry
@@ -129,42 +121,44 @@ extern void bbq_ring_free(bbq_queue_s *q);
  * @param q
  * 队列指针
  * @param data
- * void *类型，需要调用者在函数外自行申请空间。
+ * void *类型，指针也要取地址后传入。例如int a 或 int *a 都传入 (void *)(&a)
  * @return
  * BBQ_OK           0    ：成功
  * BBQ_QUEUE_FULL  -1001 : 失败，队列已满
  * BBQ_QUEUE_BUSY  -1002 : 失败,队列忙碌中
  * BBQ_ERROR       -1    ：未知错误
+ * BBQ_NULL_PTR    -3    ：传入空指针
  */
-extern int bbq_enqueue(bbq_queue_s *q, bbq_data data);
+extern int bbq_enqueue(bbq_queue_s *q, void *data);
 
 /**
  * 消息队列出队
  * @param q
  * 队列指针
  * @param deq_data
- * void **类型，出队成功将对*deq_data赋值，出队失败，【不会】对*deq_data置NULL。
+ * 出队成功将复制数据到该参数。
  * 请不要以此判断是否出队列成功，应以return值作为判断依据。
  * @return
  * BBQ_OK           0    ：成功
  * BBQ_QUEUE_BUSY  -1002 : 失败,队列忙碌中
  * BBQ_QUEUE_EMPTY -1003 : 失败,队列已空（出队）
  * BBQ_ERROR       -1    ：未知错误
+ * BBQ_NULL_PTR    -3    ：传入空指针
  */
-extern int bbq_dequeue(bbq_queue_s *q, bbq_data *deq_data);
+extern int bbq_dequeue(bbq_queue_s *q, void *deq_data);
 
 /**
  * 将多个对象从一个环形队列ring取出，直到达到最大数量，或是出队失败
  * @param q
  *   队列指针
  * @param obj_table
- *   出队列数据表
+ *   出队数组的首地址，例如 int a[10] 或 int *a[10]，都传入(void *)a
  * @param n
  *   obj_table的成员个数
  * @return
  *   实际出队个数
  */
-extern uint32_t bbq_dequeue_burst(bbq_queue_s *q, bbq_data *obj_table, uint32_t n);
+extern uint32_t bbq_dequeue_burst(bbq_queue_s *q, void *obj_table, uint32_t n);
 
 /**
  * 尝试一次入队多个数据，直到达到最大数量，或是入队失败
@@ -172,13 +166,13 @@ extern uint32_t bbq_dequeue_burst(bbq_queue_s *q, bbq_data *obj_table, uint32_t 
  * @param q
  *   队列指针
  * @param obj_table
- *   入队列数据表
+ *   入队数组的首地址，例如 int a[10] 或 int *a[10]，都传入(void *)a
  * @param n
  *   obj_table的成员个数
  * @return
  *   实际入队个数
  */
-uint32_t bbq_enqueue_burst(bbq_queue_s *q, bbq_data *obj_table, unsigned int n);
+uint32_t bbq_enqueue_burst(bbq_queue_s *q, void *obj_table, unsigned int n);
 
 // -----------------------------用于内存测试-------------------------------
 // 当BBQ_MEMORY宏定义开关打开，将对内存分配释放进行统计，方便排查内存泄漏

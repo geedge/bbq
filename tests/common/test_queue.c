@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-04 18:15:59
+ * @LastEditTime: 2024-06-04 22:07:37
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -21,12 +21,20 @@ void test_busy_loop(uint32_t busy_loop) {
 int test_queue_init_bbq(test_cfg *cfg, test_queue_s *q) {
     bbq_queue_s *ring;
 
-    if (cfg->ring.block_count == 0) {
-        q->ring = bbq_ring_create_with_socket(cfg->ring.entries_cnt, sizeof(void *), 0, BBQ_RETRY_NEW);
+    size_t obj_size = 0;
+    if (cfg->ring.workload == TEST_WORKLOAD_SIMPLE) {
+        obj_size = sizeof(test_data);
     } else {
+        obj_size = sizeof(test_data *);
+    }
+
+    if (cfg->ring.block_count == 0) {
+        q->ring = bbq_ring_create_with_socket(cfg->ring.entries_cnt, obj_size, 0, BBQ_RETRY_NEW);
+    } else {
+
         q->ring = bbq_ring_create_bnbs_with_socket(cfg->ring.block_count,
                                                    cfg->ring.entries_cnt / cfg->ring.block_count,
-                                                   sizeof(void *),
+                                                   obj_size,
                                                    0, BBQ_RETRY_NEW);
     }
 
@@ -105,7 +113,7 @@ int test_exec_enqueue(test_queue_s *q, void *obj, test_time_metric *op_use_diff)
     return ret;
 }
 
-int test_exec_dequeue(test_queue_s *q, void **obj, test_time_metric *op_use_diff) {
+int test_exec_dequeue(test_queue_s *q, void *obj, test_time_metric *op_use_diff) {
     int ret = 0;
 
     test_time_metric op_use_start = test_clock_time_get();
@@ -155,7 +163,7 @@ void *test_thread_producer_start(void *arg) {
             if (exit_data->complex_data.data != NULL) {
                 exit_data->complex_data.data[exit_data->complex_data.data_cnt] = *data;
             }
-            ret = test_exec_enqueue(q, data, &op_latency);
+            ret = test_exec_enqueue(q, &data, &op_latency);
             if (ret == 0) {
                 exit_data->complex_data.data_cnt++;
             } else {
@@ -218,13 +226,17 @@ void *test_thread_consumer_start(void *arg) {
             }
         }
 
+        test_data data_tmp = {0};
         test_data *data = NULL;
+        if (t_arg->cfg->ring.workload == TEST_WORKLOAD_SIMPLE) {
+            data = &data_tmp;
+        }
 
-        ret = test_exec_dequeue(q, (void **)(&data), &op_latency);
+        ret = test_exec_dequeue(q, data, &op_latency);
         if (ret == 0) {
             if (t_arg->cfg->ring.workload == TEST_WORKLOAD_SIMPLE) {
                 if (data->data != TEST_DATA_MAGIC) {
-                    BBQ_ERR_LOG("the obtained data is not consistent with the expectation, expect:%u actual:%u", TEST_DATA_MAGIC, *data);
+                    BBQ_ERR_LOG("the obtained data is not consistent with the expectation, expect:%u actual:%u", TEST_DATA_MAGIC, data->data);
                     exit_data->data_error_cnt += 1;
                 }
             } else {
@@ -235,7 +247,7 @@ void *test_thread_consumer_start(void *arg) {
                 }
 
                 if (data->data != TEST_DATA_MAGIC) {
-                    BBQ_ERR_LOG("the obtained data is not consistent with the expectation, expect:%u actual:%u", TEST_DATA_MAGIC, *data);
+                    BBQ_ERR_LOG("the obtained data is not consistent with the expectation, expect:%u actual:%u", TEST_DATA_MAGIC, data->data);
                     data_error_cnt += 1;
                 }
 

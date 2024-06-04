@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-03 22:14:27
+ * @LastEditTime: 2024-06-04 20:55:56
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -14,7 +14,7 @@
 
 typedef void (*test_ring_free_f)(void *ring);
 typedef int (*test_ring_enqueue_f)(void *ring, void *obj);
-typedef int (*test_ring_dequeue_f)(void *ring, void **obj);
+typedef int (*test_ring_dequeue_f)(void *ring, void *obj);
 
 typedef struct {
     test_ring_type ring_type;
@@ -78,7 +78,7 @@ extern pthread_t *test_one_thread_create(test_cfg *cfg, test_queue_s *q, test_th
 extern void test_check_run_time(test_cfg *cfg);
 extern void *test_thread_consumer_start(void *arg);
 extern void *test_thread_producer_start(void *arg);
-extern int test_exec_dequeue(test_queue_s *q, void **obj, test_time_metric *op_use_diff);
+extern int test_exec_dequeue(test_queue_s *q, void *obj, test_time_metric *op_use_diff);
 extern int test_exec_enqueue(test_queue_s *q, void *obj, test_time_metric *op_use_diff);
 extern test_exit_data *test_exit_data_destory(test_exit_data *data);
 extern test_exit_data *test_exit_data_create(test_thread_arg_s *t_arg);
