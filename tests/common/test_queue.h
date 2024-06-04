@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-04 20:55:56
+ * @LastEditTime: 2024-06-04 22:48:22
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -45,8 +45,6 @@ typedef struct {
 typedef struct {
     pthread_t thread_id;
     test_thread_arg_s *arg;
-    test_data simple_data;
-    test_complex_data complex_data;
     test_time_metric metric_start;
     test_time_metric metric_end;
     uint64_t run_times;
@@ -91,4 +89,7 @@ extern uint64_t bbq_idx(bbq_queue_s *q, uint64_t x);
 extern uint64_t bbq_off(bbq_queue_s *q, uint64_t x);
 extern uint64_t bbq_head_vsn(bbq_queue_s *q, uint64_t x);
 extern uint64_t bbq_cur_vsn(bbq_queue_s *q, uint64_t x);
+
+extern test_data *test_data_create();
+extern void test_data_destory(test_data *data);
 #endif

@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-04 21:16:01
+ * @LastEditTime: 2024-06-04 22:37:46
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -90,7 +90,7 @@ typedef struct {
 typedef enum {
     TEST_MODULE_UTEST,
     TEST_MODULE_COMMON,
-    TEST_MODULE_COMMON_EXIT_DATA,
+    TEST_MODULE_DATA,
     TEST_MODULE_BCM,
     TEST_MODULE_TABLE,
     TEST_MODULE_TABLE_OBJ,
