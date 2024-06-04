@@ -1,14 +1,14 @@
 /*
  * @Description: 描述信息
  * @Date: 2024-05-25 10:55:48
- * @LastEditTime: 2024-06-02 21:53:47
+ * @LastEditTime: 2024-06-04 11:53:49
  */
 
 #include "test_mix.h"
-#include <string.h>
-#include <sys/time.h>
 #include "bbq.h"
 #include "iniparser.h"
+#include <string.h>
+#include <sys/time.h>
 
 typedef struct {
     aotmic_uint64 malloc_cnt;
@@ -17,8 +17,8 @@ typedef struct {
 
 test_memory_s test_memory_g[TEST_MODULE_MAX] = {0};
 
-void* test_malloc(test_module_e module, size_t size) {
-    void* ptr = malloc(size);
+void *test_malloc(test_module_e module, size_t size) {
+    void *ptr = malloc(size);
     if (ptr != NULL) {
         atomic_fetch_add(&test_memory_g[module].malloc_cnt, 1);
     }
@@ -26,14 +26,14 @@ void* test_malloc(test_module_e module, size_t size) {
     return ptr;
 }
 
-void* test_calloc(test_module_e module, size_t size) {
-    void* ptr = test_malloc(module, size);
+void *test_calloc(test_module_e module, size_t size) {
+    void *ptr = test_malloc(module, size);
     if (ptr != NULL) {
         memset(ptr, 0, size);
     }
 }
 
-void test_free(test_module_e module, void* ptr) {
+void test_free(test_module_e module, void *ptr) {
     if (ptr != NULL) {
         atomic_fetch_add(&test_memory_g[module].free_cnt, 1);
     }
@@ -77,9 +77,9 @@ void test_memory_info() {
     }
 }
 
-int test_load_config(const char* config, const char* ring_type, test_cfg* cfg) {
+int test_load_config(const char *config, const char *ring_type, test_cfg *cfg) {
     // 加载配置
-    dictionary* ini = iniparser_load(config);
+    dictionary *ini = iniparser_load(config);
     if (ini == NULL) {
         return -1;
     }
@@ -89,16 +89,16 @@ int test_load_config(const char* config, const char* ring_type, test_cfg* cfg) {
     cfg->base.name[sizeof(cfg->base.name) - 1] = '\0';
 
     // 获取键值
-    char* introduce = (char*)iniparser_getstring(ini, "base:introduce", "none");
+    char *introduce = (char *)iniparser_getstring(ini, "base:introduce", "none");
     strncpy(cfg->base.introduce, introduce, sizeof(cfg->base.introduce) - 1);
-    cfg->base.introduce[sizeof(cfg->base.introduce) - 1] = '\0';  // 手工写上 \0
+    cfg->base.introduce[sizeof(cfg->base.introduce) - 1] = '\0'; // 手工写上 \0
 
     BBQ_INFO_LOG("introduce:%s", cfg->base.introduce);
 
     cfg->base.cores_cnt = iniparser_getint(ini, "base:cores_cnt", 0);
     BBQ_INFO_LOG("cores_cnt:%u", cfg->base.cores_cnt);
 
-    char* workload = (char*)iniparser_getstring(ini, "ring:workload", "unknown");
+    char *workload = (char *)iniparser_getstring(ini, "ring:workload", "unknown");
     cfg->ring.workload = test_workload_str2enum(workload);
     BBQ_INFO_LOG("workload:%s(%u)", workload, cfg->ring.workload);
 
@@ -143,24 +143,24 @@ test_time_metric test_clock_time_get() {
     struct timespec timestamp;
 
     // clock_gettime(CLOCK_MONOTONIC, &metric.timestamp); //从系统启动这一刻起开始计时,不受系统时间被用户改变的影响
-    clock_gettime(CLOCK_REALTIME, &metric.timestamp);  // 系统实时时间,随系统实时时间改变而改变
+    clock_gettime(CLOCK_REALTIME, &metric.timestamp); // 系统实时时间,随系统实时时间改变而改变
     return metric;
 }
 
-uint64_t test_clock_time_to_ns(test_time_metric* metric) {
+uint64_t test_clock_time_to_ns(test_time_metric *metric) {
     return metric->timestamp.tv_nsec + metric->timestamp.tv_sec * 1000 * 1000 * 1000;
 }
 
-uint64_t test_clock_time_to_double(test_time_metric* metric) {
+uint64_t test_clock_time_to_double(test_time_metric *metric) {
     return metric->timestamp.tv_sec +
            metric->timestamp.tv_nsec * 1.0 / 1000 / 1000 / 1000;
 }
 
-bool test_clock_time_is_zero(test_time_metric* metric) {
+bool test_clock_time_is_zero(test_time_metric *metric) {
     return metric->timestamp.tv_sec == 0 && metric->timestamp.tv_nsec == 0;
 }
 
-bool test_timespec_is_after(const struct timespec* a, const struct timespec* b) {
+bool test_timespec_is_after(const struct timespec *a, const struct timespec *b) {
     if (a->tv_sec > b->tv_sec) {
         // a的秒数大于b的秒数，所以a在b之后
         return true;
@@ -189,7 +189,7 @@ test_time_metric test_clock_time_sub(test_time_metric now, test_time_metric last
     return diff;
 }
 
-test_workload_e test_workload_str2enum(const char* workload) {
+test_workload_e test_workload_str2enum(const char *workload) {
     if (strcmp(workload, "simple") == 0) {
         return TEST_WORKLOAD_SIMPLE;
     } else if (strcmp(workload, "complex") == 0) {
@@ -199,12 +199,12 @@ test_workload_e test_workload_str2enum(const char* workload) {
     return TEST_WORKLOAD_MAX;
 }
 
-char* ring_type_map[TEST_RING_TYPE_MAX] = {
+char *ring_type_map[TEST_RING_TYPE_MAX] = {
     [TEST_RING_TYPE_BBQ] = TEST_RING_TYPE_BBQ_STR,
     [TEST_RING_TYPE_DPDK] = TEST_RING_TYPE_DPDK_STR,
 };
 
-test_ring_type test_ring_type_str2enum(const char* ring_type) {
+test_ring_type test_ring_type_str2enum(const char *ring_type) {
     if (strcmp(ring_type, TEST_RING_TYPE_BBQ_STR) == 0) {
         return TEST_RING_TYPE_BBQ;
     } else if (strcmp(ring_type, TEST_RING_TYPE_DPDK_STR) == 0) {
@@ -214,10 +214,61 @@ test_ring_type test_ring_type_str2enum(const char* ring_type) {
     return TEST_RING_TYPE_MAX;
 }
 
-char* test_ring_type_enum2str(test_ring_type ring_type) {
+char *test_ring_type_enum2str(test_ring_type ring_type) {
     if (ring_type >= TEST_RING_TYPE_MAX) {
         return "unknown";
     } else {
         return ring_type_map[ring_type];
     }
+}
+
+void **test_table_create(uint32_t count) {
+    void **table = test_malloc(TEST_MODULE_TABLE, sizeof(void **) * count);
+    memset(table, 0, sizeof(void **) * count);
+    return table;
+}
+
+void test_table_destory(void **table) {
+    test_free(TEST_MODULE_TABLE_OBJ, table);
+}
+
+void **test_enqueue_table_create(uint32_t count) {
+    void **table = test_table_create(count);
+    if (table == NULL) {
+        return NULL;
+    }
+
+    for (uint32_t i = 0; i < count; i++) {
+        table[i] = test_malloc(TEST_MODULE_TABLE_OBJ, sizeof(int *));
+        if (table[i] == NULL) {
+            goto error;
+        }
+        *((int *)table[i]) = TEST_TABLE_DATA_MAGIC;
+    }
+
+    return table;
+
+error:
+    if (table) {
+        for (uint32_t i = 0; i < count; i++) {
+            if (table[i] != NULL) {
+                test_free(TEST_MODULE_TABLE_OBJ, table[i]);
+            } else {
+                break;
+            }
+        }
+        test_table_destory(table);
+    }
+    return NULL;
+}
+
+void test_enqueue_table_destory(void **table, uint32_t count) {
+    if (table == NULL) {
+        return;
+    }
+
+    for (uint32_t i = 0; i < count; i++) {
+        test_free(TEST_MODULE_TABLE_OBJ, table[i]);
+    }
+    test_free(TEST_MODULE_TABLE, table);
 }

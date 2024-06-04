@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu@geedgenetworks.com
- * @LastEditTime: 2024-06-03 22:57:34
+ * @LastEditTime: 2024-06-04 10:19:41
  * @Describe: bbq（Block-based Bounded Queue）头文件
  * 参考：https://www.usenix.org/system/files/atc22-wang-jiawei.pdf
  */
@@ -152,6 +152,33 @@ extern int bbq_enqueue(bbq_queue_s *q, bbq_data data);
  * BBQ_ERROR       -1    ：未知错误
  */
 extern int bbq_dequeue(bbq_queue_s *q, bbq_data *deq_data);
+
+/**
+ * 将多个对象从一个环形队列ring取出，直到达到最大数量，或是出队失败
+ * @param q
+ *   队列指针
+ * @param obj_table
+ *   出队列数据表
+ * @param n
+ *   obj_table的成员个数
+ * @return
+ *   实际出队个数
+ */
+extern uint32_t bbq_dequeue_burst(bbq_queue_s *q, bbq_data *obj_table, uint32_t n);
+
+/**
+ * 尝试一次入队多个数据，直到达到最大数量，或是入队失败
+ *
+ * @param q
+ *   队列指针
+ * @param obj_table
+ *   入队列数据表
+ * @param n
+ *   obj_table的成员个数
+ * @return
+ *   实际入队个数
+ */
+uint32_t bbq_enqueue_burst(bbq_queue_s *q, bbq_data *obj_table, unsigned int n);
 
 // -----------------------------用于内存测试-------------------------------
 // 当BBQ_MEMORY宏定义开关打开，将对内存分配释放进行统计，方便排查内存泄漏

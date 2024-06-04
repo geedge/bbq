@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-03 23:01:48
+ * @LastEditTime: 2024-06-04 11:12:14
  * @Email: liuyu@geedgenetworks.com
  * @Describe: bbq（Block-based Bounded Queue）实现
  * 参考：https://www.usenix.org/system/files/atc22-wang-jiawei.pdf
@@ -254,13 +254,6 @@ int bbq_enqueue(bbq_queue_s *q, bbq_data data) {
     }
 }
 
-// int bbq_dequeue_burst(bbq_queue_s *q, void **obj_table, unsigned int n, unsigned int *available) {
-// }
-
-// int bbq_enqueue_burst(bbq_queue_s *q, void *const *obj_table,
-//                       unsigned int n, unsigned int *free_space) {
-// }
-
 /* 消息队列出队 */
 int bbq_dequeue(bbq_queue_s *q, bbq_data *deq_data) {
     while (true) {
@@ -295,6 +288,30 @@ int bbq_dequeue(bbq_queue_s *q, bbq_data *deq_data) {
             return BBQ_ERROR;
         }
     }
+}
+
+/* 将多个对象从一个环形队列ring取出，直到达到最大数量，或是出队失败 */
+uint32_t bbq_dequeue_burst(bbq_queue_s *q, bbq_data *obj_table, uint32_t n) {
+    uint32_t cnt = 0;
+    for (cnt = 0; cnt < n; cnt++) {
+        if (BBQ_OK != bbq_dequeue(q, &obj_table[cnt])) {
+            return cnt;
+        }
+    }
+
+    return cnt;
+}
+
+/* 尝试一次入队多个数据，直到达到最大数量，或是入队失败 */
+uint32_t bbq_enqueue_burst(bbq_queue_s *q, bbq_data *obj_table, unsigned int n) {
+    uint32_t cnt = 0;
+    for (cnt = 0; cnt < n; cnt++) {
+        if (BBQ_OK != bbq_enqueue(q, obj_table[cnt])) {
+            return cnt;
+        }
+    }
+
+    return cnt;
 }
 
 bbq_queue_state_s allocate_entry(bbq_queue_s *q, bbq_block_s *block) {

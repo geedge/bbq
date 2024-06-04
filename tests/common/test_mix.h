@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-01 01:14:47
+ * @LastEditTime: 2024-06-04 10:40:33
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -12,6 +12,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <time.h>
+
+#define TEST_TABLE_DATA_MAGIC 98765
 
 typedef enum {
     TEST_THREAD_PRODUCER,
@@ -90,6 +92,8 @@ typedef enum {
     TEST_MODULE_COMMON,
     TEST_MODULE_COMMON_EXIT_DATA,
     TEST_MODULE_BCM,
+    TEST_MODULE_TABLE,
+    TEST_MODULE_TABLE_OBJ,
     TEST_MODULE_MAX,
 } test_module_e;
 
@@ -109,4 +113,8 @@ extern void test_free(test_module_e module, void *ptr);
 extern void test_memory_info();
 extern void test_memory_counter_clear();
 extern bool test_malloc_free_equal();
+extern void **test_enqueue_table_create(uint32_t count);
+extern void test_enqueue_table_destory(void **table, uint32_t count);
+extern void **test_table_create(uint32_t count);
+extern void test_table_destory(void **table);
 #endif
