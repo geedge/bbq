@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-04 11:12:14
+ * @LastEditTime: 2024-06-04 15:23:38
  * @Email: liuyu@geedgenetworks.com
  * @Describe: bbq（Block-based Bounded Queue）实现
  * 参考：https://www.usenix.org/system/files/atc22-wang-jiawei.pdf
@@ -109,7 +109,7 @@ unsigned ceil_log2(uint64_t x) {
 }
 
 /* 创建消息队列，bn和bs必须是2的N次幂，socket_id用于多numa分配内存，free_func先设置NULL */
-bbq_queue_s *bbq_ring_create_bnbs_with_socket(uint32_t bn, uint32_t bs, int socket_id, drop_old_func free_func) {
+bbq_queue_s *bbq_ring_create_bnbs_with_socket(uint32_t bn, uint32_t bs, int socket_id, bbq_policy_e policy) {
     int ret = 0;
     bool numa_enable = true;
 
@@ -140,14 +140,8 @@ bbq_queue_s *bbq_ring_create_bnbs_with_socket(uint32_t bn, uint32_t bs, int sock
     q->socket_id = socket_id;
     q->phead = 0;
     q->chead = 0;
+    q->policy = policy;
 
-    if (free_func == NULL) {
-        q->policy = BBQ_RETRY_NEW;
-        q->drop_old_free = NULL;
-    } else {
-        q->policy = BBQ_DROP_OLD;
-        q->drop_old_free = free_func;
-    }
     q->blocks = bbq_malloc(BBQ_MODULE_QUEUE_BLOCK_NB, socket_id, bn * sizeof(bbq_block_s));
     if (q->blocks == NULL) {
         BBQ_ERR_LOG("bbq malloc for blocks error");
@@ -186,12 +180,12 @@ error:
 }
 
 /* 创建消息队列，bn和bs必须是2的N次幂，free_func先设置NULL */
-bbq_queue_s *bbq_ring_create_bnbs(uint32_t bn, uint32_t bs, drop_old_func free_func) {
-    return bbq_ring_create_bnbs_with_socket(bn, bs, BBQ_INVALID_SOCKET, free_func);
+bbq_queue_s *bbq_ring_create_bnbs(uint32_t bn, uint32_t bs, bbq_policy_e policy) {
+    return bbq_ring_create_bnbs_with_socket(bn, bs, BBQ_INVALID_SOCKET, policy);
 }
 
 /* 创建消息队列，count必须大于1，且是2的N次幂，bn和bs将根据count值自动计算，socket_id用于多numa分配内存，free_func先设置NULL */
-bbq_queue_s *bbq_ring_create_with_socket(uint32_t count, int socket_id, drop_old_func free_func) {
+bbq_queue_s *bbq_ring_create_with_socket(uint32_t count, int socket_id, bbq_policy_e policy) {
     if (bbq_check_power_of_two(count) == false || count == 1) {
         BBQ_ERR_LOG("bbq entries number must be power of two and greater than 1, now is  :%lu", count);
         return NULL;
@@ -199,13 +193,13 @@ bbq_queue_s *bbq_ring_create_with_socket(uint32_t count, int socket_id, drop_old
 
     uint32_t bn = bbq_blocks_calc(count);
     uint32_t bs = count / bn;
-    return bbq_ring_create_bnbs_with_socket(bn, bs, socket_id, free_func);
+    return bbq_ring_create_bnbs_with_socket(bn, bs, socket_id, policy);
 }
 
 /* 创建消息队列，count必须大于1，且是2的N次幂，bn和bs将根据count值自动计算，free_func先设置NULL */
-bbq_queue_s *bbq_ring_create(uint32_t count, drop_old_func free_func) {
+bbq_queue_s *bbq_ring_create(uint32_t count, bbq_policy_e policy) {
     // 传入无效socket_id，将使用malloc分配内存
-    return bbq_ring_create_with_socket(count, BBQ_INVALID_SOCKET, free_func);
+    return bbq_ring_create_with_socket(count, BBQ_INVALID_SOCKET, policy);
 }
 
 /* 释放消息队列，与bbq_ring_create系列接口成对*/

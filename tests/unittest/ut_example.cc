@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-04 11:52:32
+ * @LastEditTime: 2024-06-04 15:21:19
  * @Email: liuyu@geedgenetworks.com
  * @Describe: 简单的测试用例，测试基本功能，同时让调用者快速上手
  */
@@ -36,7 +36,7 @@ TEST(burst, init) {
     void **deq_table3 = test_table_create(cnt3);
 
     // 创建队列
-    q = bbq_ring_create(buf_cnt, NULL);
+    q = bbq_ring_create(buf_cnt, BBQ_RETRY_NEW);
     EXPECT_TRUE(q);
 
     // 批量入队

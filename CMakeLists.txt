@@ -5,6 +5,7 @@ project(BBQ_TOP)
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/iniparser
+    ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/rmind_ringbuf
 ) 
 
 # 设置输出目录

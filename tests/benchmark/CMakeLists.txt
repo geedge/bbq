@@ -6,4 +6,4 @@ file(GLOB SRC_LIST "${CMAKE_CURRENT_SOURCE_DIR}/*.c")
 list(APPEND SRC_LIST ${SRC_COMMON_LIST})
 
 add_executable(benchmark ${SRC_LIST}) # 添加可执行程序
-target_link_libraries(benchmark pthread rte_ring rte_eal rte_kvargs rte_telemetry m) # 链接库
+target_link_libraries(benchmark pthread rte_ring rte_eal rte_kvargs rte_telemetry m rmind_ringbuf) # 链接库

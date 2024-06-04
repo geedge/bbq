@@ -1,7 +1,7 @@
 /*
  * @Description: 描述信息
  * @Date: 2024-05-25 10:55:48
- * @LastEditTime: 2024-06-04 11:53:49
+ * @LastEditTime: 2024-06-04 15:27:04
  */
 
 #include "test_mix.h"
@@ -229,7 +229,7 @@ void **test_table_create(uint32_t count) {
 }
 
 void test_table_destory(void **table) {
-    test_free(TEST_MODULE_TABLE_OBJ, table);
+    test_free(TEST_MODULE_TABLE, table);
 }
 
 void **test_enqueue_table_create(uint32_t count) {
