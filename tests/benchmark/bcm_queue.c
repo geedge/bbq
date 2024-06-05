@@ -1,32 +1,23 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-05 18:28:56
+ * @LastEditTime: 2024-06-05 22:58:17
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
 #include "bcm_queue.h"
 
-static __rte_always_inline int
-bcm_dpdk_ring_enqueue(struct rte_ring *r, void *obj) {
-    test_data **tmp_data = (test_data **)obj;
-    return rte_ring_enqueue(r, *tmp_data);
+static __rte_always_inline unsigned int
+bcm_ring_enqueue_burst(struct rte_ring* r, void* obj_table, size_t n, unsigned int flags) {
+    return rte_ring_enqueue_burst(r, (void* const*)obj_table, n, NULL);
 }
 
 static __rte_always_inline unsigned int
-bcm_ring_enqueue_burst(struct rte_ring *r, void *obj_table,
-                       size_t n, unsigned int flags) {
-
-    return rte_ring_enqueue_burst(r, (void *const *)obj_table, n, NULL);
+bcm_ring_dequeue_burst(struct rte_ring* r, void* obj_table, unsigned int n) {
+    return rte_ring_dequeue_burst(r, (void**)obj_table, n, NULL);
 }
 
-static __rte_always_inline unsigned int
-bcm_ring_dequeue_burst(struct rte_ring *r, void *obj_table,
-                       unsigned int n) {
-    return rte_ring_dequeue_burst(r, (void **)obj_table, n, NULL);
-}
-
-int test_queue_init_dpdk(test_cfg *cfg, test_queue_s *q) {
-    char *argv[1] = {"bcm_dpdk"};
+int test_queue_init_dpdk(test_cfg* cfg, test_queue_s* q) {
+    char* argv[1] = {"bcm_dpdk"};
 
     // eal环境初始化，如接口、内存等
     if (rte_eal_init(1, argv) < 0) {
@@ -47,13 +38,13 @@ int test_queue_init_dpdk(test_cfg *cfg, test_queue_s *q) {
         flags |= RING_F_MC_RTS_DEQ;
     }
 
-    q->ring = (void *)rte_ring_create("dpdk_ring", cfg->ring.entries_cnt, rte_socket_id(), RING_F_MP_RTS_ENQ | RING_F_MC_RTS_DEQ);
+    q->ring = (void*)rte_ring_create("dpdk_ring", cfg->ring.entries_cnt, rte_socket_id(), RING_F_MP_RTS_ENQ | RING_F_MC_RTS_DEQ);
     if (q->ring == NULL) {
         return BBQ_NULL_PTR;
     }
 
     q->ring_free_f = (test_ring_free_f)rte_ring_free;
-    q->enqueue_f = (test_ring_enqueue_f)bcm_dpdk_ring_enqueue;
+    q->enqueue_f = (test_ring_enqueue_f)rte_ring_enqueue;
     q->dequeue_f = (test_ring_dequeue_f)rte_ring_dequeue;
     q->enqueue_burst_f = (test_enqueue_burst_f)bcm_ring_enqueue_burst;
     q->dequeue_burst_f = (test_dequeue_burst_f)bcm_ring_dequeue_burst;
@@ -61,7 +52,7 @@ int test_queue_init_dpdk(test_cfg *cfg, test_queue_s *q) {
     return BBQ_OK;
 }
 
-int bcm_queue_init(test_cfg *cfg, test_queue_s *q) {
+int bcm_queue_init(test_cfg* cfg, test_queue_s* q) {
     if (cfg == NULL || q == NULL) {
         return BBQ_NULL_PTR;
     }
@@ -69,14 +60,14 @@ int bcm_queue_init(test_cfg *cfg, test_queue_s *q) {
     int ret = -1;
     q->ring_type = cfg->ring.ring_type;
     switch (q->ring_type) {
-    case TEST_RING_TYPE_DPDK:
-        ret = test_queue_init_dpdk(cfg, q);
-        break;
-    case TEST_RING_TYPE_BBQ:
-        ret = test_queue_init_bbq(cfg, q);
-        break;
-    default:
-        return BBQ_UNKNOWN_TYPE;
+        case TEST_RING_TYPE_DPDK:
+            ret = test_queue_init_dpdk(cfg, q);
+            break;
+        case TEST_RING_TYPE_BBQ:
+            ret = test_queue_init_bbq(cfg, q);
+            break;
+        default:
+            return BBQ_UNKNOWN_TYPE;
     }
 
     return ret;

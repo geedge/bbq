@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-05 22:32:52
+ * @LastEditTime: 2024-06-05 23:01:09
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -113,6 +113,8 @@ test_data* test_data_create() {
     simple_data->data = TEST_DATA_MAGIC;
     simple_data->enqueue_time.timestamp.tv_sec = 0;
     simple_data->enqueue_time.timestamp.tv_nsec = 0;
+
+    return simple_data;
 }
 
 void test_data_destory(test_data* data) {
@@ -167,7 +169,7 @@ void* test_thread_producer_start(void* arg) {
         }
 
         if (cfg->ring.workload == TEST_WORKLOAD_SIMPLE) {
-            ret = test_exec_enqueue(q, exit_data->simple_data, &op_latency);
+            ret = test_exec_enqueue(q, exit_data->simple_data[0], &op_latency);
         } else {
             test_data* data = test_data_create();
             if (data == NULL) {
@@ -176,7 +178,7 @@ void* test_thread_producer_start(void* arg) {
             }
             data->enqueue_time = test_clock_time_get();
             data->data = TEST_DATA_MAGIC;
-            ret = test_exec_enqueue(q, &data, &op_latency);
+            ret = test_exec_enqueue(q, data, &op_latency);
             if (ret != 0) {
                 test_free(TEST_MODULE_DATA, data);
             }
