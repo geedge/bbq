@@ -1,15 +1,15 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-05 18:46:20
+ * @LastEditTime: 2024-06-05 22:32:52
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
 
 #include "test_queue.h"
-#include "bbq.h"
-#include "test_mix.h"
 #include <sys/prctl.h>
 #include <unistd.h>
+#include "bbq.h"
+#include "test_mix.h"
 
 void test_busy_loop(uint32_t busy_loop) {
     uint32_t loop = 0;
@@ -18,8 +18,8 @@ void test_busy_loop(uint32_t busy_loop) {
     };
 }
 
-int test_queue_init_bbq(test_cfg *cfg, test_queue_s *q) {
-    bbq_queue_s *ring;
+int test_queue_init_bbq(test_cfg* cfg, test_queue_s* q) {
+    bbq_queue_s* ring;
     size_t obj_size = sizeof(test_data);
 
     if (cfg->ring.block_count == 0) {
@@ -36,7 +36,7 @@ int test_queue_init_bbq(test_cfg *cfg, test_queue_s *q) {
         return BBQ_NULL_PTR;
     }
 
-    bbq_queue_s *bbq_ring = (bbq_queue_s *)q->ring;
+    bbq_queue_s* bbq_ring = (bbq_queue_s*)q->ring;
     BBQ_DBG_LOG("block number:%lu size:%lu", bbq_ring->bn, bbq_ring->bs);
 
     q->ring_free_f = (test_ring_free_f)bbq_ring_free;
@@ -48,17 +48,17 @@ int test_queue_init_bbq(test_cfg *cfg, test_queue_s *q) {
     return 0;
 }
 
-void test_queue_destory(test_queue_s *q) {
+void test_queue_destory(test_queue_s* q) {
     if (q != NULL && q->ring_free_f != NULL) {
         q->ring_free_f(q->ring);
     }
 }
 
-bool test_all_producer_exit(test_cfg *cfg) {
+bool test_all_producer_exit(test_cfg* cfg) {
     return atomic_load(&cfg->run.producer_exit) == cfg->ring.producer_cnt;
 }
 
-void test_wait_all_threads_ready(test_cfg *cfg) {
+void test_wait_all_threads_ready(test_cfg* cfg) {
     uint32_t thread_cnt_max = cfg->ring.consumer_cnt +
                               cfg->ring.producer_cnt;
 
@@ -70,8 +70,8 @@ void test_wait_all_threads_ready(test_cfg *cfg) {
     BBQ_DBG_LOG("thread init done!");
 }
 
-test_exit_data *test_exit_data_create(test_thread_arg_s *t_arg) {
-    test_exit_data *exit_data = (test_exit_data *)test_malloc(TEST_MODULE_COMMON, sizeof(test_exit_data));
+test_exit_data* test_exit_data_create(test_thread_arg_s* t_arg) {
+    test_exit_data* exit_data = (test_exit_data*)test_malloc(TEST_MODULE_COMMON, sizeof(test_exit_data));
     if (exit_data == NULL) {
         BBQ_ERR_LOG("malloc failed");
         exit(-1);
@@ -97,7 +97,7 @@ test_exit_data *test_exit_data_create(test_thread_arg_s *t_arg) {
     return exit_data;
 }
 
-test_exit_data *test_exit_data_destory(test_exit_data *data) {
+test_exit_data* test_exit_data_destory(test_exit_data* data) {
     test_free(TEST_MODULE_COMMON, data->arg);
     test_free(TEST_MODULE_COMMON, data);
 
@@ -108,18 +108,18 @@ test_exit_data *test_exit_data_destory(test_exit_data *data) {
     test_free(TEST_MODULE_DATA, data->simple_data);
 }
 
-test_data *test_data_create() {
-    test_data *simple_data = test_malloc(TEST_MODULE_DATA, sizeof(*simple_data));
+test_data* test_data_create() {
+    test_data* simple_data = test_malloc(TEST_MODULE_DATA, sizeof(*simple_data));
     simple_data->data = TEST_DATA_MAGIC;
     simple_data->enqueue_time.timestamp.tv_sec = 0;
     simple_data->enqueue_time.timestamp.tv_nsec = 0;
 }
 
-void test_data_destory(test_data *data) {
+void test_data_destory(test_data* data) {
     test_free(TEST_MODULE_DATA, data);
 }
 
-int test_exec_enqueue(test_queue_s *q, void *obj, test_time_metric *op_use_diff) {
+int test_exec_enqueue(test_queue_s* q, void* obj, test_time_metric* op_use_diff) {
     int ret = 0;
 
     test_time_metric op_use_start = test_clock_time_get();
@@ -129,7 +129,7 @@ int test_exec_enqueue(test_queue_s *q, void *obj, test_time_metric *op_use_diff)
     return ret;
 }
 
-int test_exec_dequeue(test_queue_s *q, void *obj, test_time_metric *op_use_diff) {
+int test_exec_dequeue(test_queue_s* q, void* obj, test_time_metric* op_use_diff) {
     int ret = 0;
 
     test_time_metric op_use_start = test_clock_time_get();
@@ -139,14 +139,14 @@ int test_exec_dequeue(test_queue_s *q, void *obj, test_time_metric *op_use_diff)
     return ret;
 }
 
-void *test_thread_producer_start(void *arg) {
+void* test_thread_producer_start(void* arg) {
     int ret = 0;
     uint64_t ok_cnt = 0;
     uint64_t run_times = 0;
-    test_thread_arg_s *t_arg = (test_thread_arg_s *)arg;
-    test_cfg *cfg = t_arg->cfg;
-    test_queue_s *q = t_arg->q;
-    test_exit_data *exit_data = test_exit_data_create(t_arg);
+    test_thread_arg_s* t_arg = (test_thread_arg_s*)arg;
+    test_cfg* cfg = t_arg->cfg;
+    test_queue_s* q = t_arg->q;
+    test_exit_data* exit_data = test_exit_data_create(t_arg);
 
     char thread_name[128] = {0};
     uint64_t op_ok_latency_ns = 0;
@@ -169,7 +169,7 @@ void *test_thread_producer_start(void *arg) {
         if (cfg->ring.workload == TEST_WORKLOAD_SIMPLE) {
             ret = test_exec_enqueue(q, exit_data->simple_data, &op_latency);
         } else {
-            test_data *data = test_data_create();
+            test_data* data = test_data_create();
             if (data == NULL) {
                 BBQ_ERR_LOG("malloc falied");
                 exit(-1);
@@ -205,14 +205,14 @@ void *test_thread_producer_start(void *arg) {
     pthread_exit(exit_data);
 }
 
-void *test_thread_consumer_start(void *arg) {
+void* test_thread_consumer_start(void* arg) {
     int ret = 0;
     uint64_t ok_cnt = 0;
     uint64_t run_times = 0;
-    test_thread_arg_s *t_arg = (test_thread_arg_s *)arg;
-    test_cfg *cfg = t_arg->cfg;
-    test_queue_s *q = t_arg->q;
-    test_exit_data *exit_data = test_exit_data_create(t_arg);
+    test_thread_arg_s* t_arg = (test_thread_arg_s*)arg;
+    test_cfg* cfg = t_arg->cfg;
+    test_queue_s* q = t_arg->q;
+    test_exit_data* exit_data = test_exit_data_create(t_arg);
     uint64_t latency_ns = 0;
     test_time_metric op_latency = {0};
     uint64_t op_ok_latency_ns;
@@ -236,7 +236,7 @@ void *test_thread_consumer_start(void *arg) {
             }
         }
 
-        test_data *data = NULL;
+        test_data* data = NULL;
         ret = test_exec_dequeue(q, &data, &op_latency);
         if (ret == 0) {
             if (t_arg->cfg->ring.workload == TEST_WORKLOAD_SIMPLE) {
@@ -281,7 +281,7 @@ void *test_thread_consumer_start(void *arg) {
     pthread_exit(exit_data);
 }
 
-void test_check_run_time(test_cfg *cfg) {
+void test_check_run_time(test_cfg* cfg) {
     if (cfg->run.run_time > 0) {
         BBQ_DBG_LOG("sleep %lus, and notify all threads to exit...", cfg->run.run_time);
         sleep(cfg->run.run_time);
@@ -289,10 +289,10 @@ void test_check_run_time(test_cfg *cfg) {
     }
 }
 
-pthread_t *
-test_one_thread_create(test_cfg *cfg, test_queue_s *q, test_thread_type_e ttype, int core, pthread_t *thread) {
+pthread_t*
+test_one_thread_create(test_cfg* cfg, test_queue_s* q, test_thread_type_e ttype, int core, pthread_t* thread) {
     BBQ_DBG_LOG("thread type:%d core:%d", ttype, core);
-    test_thread_arg_s *arg = (test_thread_arg_s *)test_malloc(TEST_MODULE_COMMON, sizeof(test_thread_arg_s)); // 线程回收时free
+    test_thread_arg_s* arg = (test_thread_arg_s*)test_malloc(TEST_MODULE_COMMON, sizeof(test_thread_arg_s));  // 线程回收时free
     arg->cfg = cfg;
     arg->q = q;
     arg->ttype = ttype;
@@ -311,13 +311,13 @@ test_one_thread_create(test_cfg *cfg, test_queue_s *q, test_thread_type_e ttype,
         core_id = (core_id + 1) < max_id ? (core_id + 1) : core_id; \
     } while (0)
 
-pthread_t *test_threads_create(test_cfg *cfg, test_queue_s *q) {
+pthread_t* test_threads_create(test_cfg* cfg, test_queue_s* q) {
     // 创建生产者消费者线程
     int ret;
     size_t thread_id = 0;
     int core_id = 0;
     size_t thread_cnt = cfg->ring.producer_cnt + cfg->ring.consumer_cnt;
-    pthread_t *threads = (pthread_t *)test_malloc(TEST_MODULE_COMMON, sizeof(pthread_t) * thread_cnt); // 存储所有线程ID的数组
+    pthread_t* threads = (pthread_t*)test_malloc(TEST_MODULE_COMMON, sizeof(pthread_t) * thread_cnt);  // 存储所有线程ID的数组
 
     // MPSC 或 SPMC 场景在第一个核心/超线程上分配单个生产者或消费者，然后将其他线程按顺序分配给核心/超线程。
     // MPMC，我们将生产者和消费者一一交错分配
@@ -338,8 +338,8 @@ pthread_t *test_threads_create(test_cfg *cfg, test_queue_s *q) {
         }
     } else {
         // MPMC 或 只有生产者 或这有消费者，核心交错分配
-        uint32_t pcnt = cfg->ring.producer_cnt; // 生产者个数
-        uint32_t ccnt = cfg->ring.consumer_cnt; // 消费者个数
+        uint32_t pcnt = cfg->ring.producer_cnt;  // 生产者个数
+        uint32_t ccnt = cfg->ring.consumer_cnt;  // 消费者个数
         for (core_id = 0; core_id < cfg->base.cores_cnt && pcnt > 0 && ccnt > 0;) {
             if ((core_id & 1) == 0) {
                 // 偶数
@@ -366,11 +366,11 @@ pthread_t *test_threads_create(test_cfg *cfg, test_queue_s *q) {
     return threads;
 }
 
-void test_threads_destory(pthread_t *threads) {
+void test_threads_destory(pthread_t* threads) {
     test_free(TEST_MODULE_COMMON, threads);
 }
 
-void test_merge_data_detail(test_merge_data *merge, test_exit_data *exit_data) {
+void test_merge_data_detail(test_merge_data* merge, test_exit_data* exit_data) {
     merge->run_times += exit_data->run_times;
     merge->ok_cnt += exit_data->ok_cnt;
     merge->latency_ns += exit_data->latency_ns;
@@ -379,7 +379,7 @@ void test_merge_data_detail(test_merge_data *merge, test_exit_data *exit_data) {
     merge->data_error_cnt += exit_data->data_error_cnt;
 }
 
-void test_merge_all_data(test_exit_data **exit_data, uint32_t thread_cnt, test_merge_s *merge) {
+void test_merge_all_data(test_exit_data** exit_data, uint32_t thread_cnt, test_merge_s* merge) {
     test_time_metric p_start = {0};
     test_time_metric p_end = {0};
     test_time_metric c_start = {0};
