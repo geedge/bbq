@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-04 23:18:03
+ * @LastEditTime: 2024-06-05 18:28:56
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -10,6 +10,19 @@ static __rte_always_inline int
 bcm_dpdk_ring_enqueue(struct rte_ring *r, void *obj) {
     test_data **tmp_data = (test_data **)obj;
     return rte_ring_enqueue(r, *tmp_data);
+}
+
+static __rte_always_inline unsigned int
+bcm_ring_enqueue_burst(struct rte_ring *r, void *obj_table,
+                       size_t n, unsigned int flags) {
+
+    return rte_ring_enqueue_burst(r, (void *const *)obj_table, n, NULL);
+}
+
+static __rte_always_inline unsigned int
+bcm_ring_dequeue_burst(struct rte_ring *r, void *obj_table,
+                       unsigned int n) {
+    return rte_ring_dequeue_burst(r, (void **)obj_table, n, NULL);
 }
 
 int test_queue_init_dpdk(test_cfg *cfg, test_queue_s *q) {
@@ -42,6 +55,8 @@ int test_queue_init_dpdk(test_cfg *cfg, test_queue_s *q) {
     q->ring_free_f = (test_ring_free_f)rte_ring_free;
     q->enqueue_f = (test_ring_enqueue_f)bcm_dpdk_ring_enqueue;
     q->dequeue_f = (test_ring_dequeue_f)rte_ring_dequeue;
+    q->enqueue_burst_f = (test_enqueue_burst_f)bcm_ring_enqueue_burst;
+    q->dequeue_burst_f = (test_dequeue_burst_f)bcm_ring_dequeue_burst;
 
     return BBQ_OK;
 }

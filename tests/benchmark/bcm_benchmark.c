@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-04 23:31:57
+ * @LastEditTime: 2024-06-05 18:45:06
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -94,19 +94,24 @@ void bcm_report_generate(test_cfg *cfg, test_exit_data **exit_data, uint32_t thr
     }
 }
 
-#if 1
 int main(int argc, char *argv[]) {
     char *config;
     char *ring_type;
+    uint32_t burst_cnt = 0;
 
-    if (argc == 3) {
+    if (argc == 4) {
         config = argv[1];
         ring_type = argv[2];
+        burst_cnt = strtoul(argv[3], NULL, 0);
+        if (burst_cnt <= 0) {
+            burst_cnt = 1;
+        }
     } else {
         config = "/root/code/c/bbq-ly/tests/benchmark/config/compare/general/case1_simple_spsc.ini";
         // ring_type = "dpdk";
         ring_type = "bbq";
-        BBQ_ERR_LOG("use default config, ringt_type:bbq config:%s", config);
+        burst_cnt = 100;
+        BBQ_ERR_LOG("use default config, ringt_type:%s burst:%u config:%s argc:%d", ring_type, burst_cnt, config, argc);
     }
 
     char thread_name[128] = {0};
@@ -115,7 +120,7 @@ int main(int argc, char *argv[]) {
 
     // 加载配置
     test_cfg cfg;
-    if (test_load_config(config, ring_type, &cfg) != 0) {
+    if (test_load_config(config, ring_type, burst_cnt, &cfg) != 0) {
         BBQ_ERR_LOG("input config path");
         return -1;
     }
@@ -163,63 +168,3 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
-#else
-
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
-
-#include "ringbuf.h"
-#define MAX_WORKERS 2
-
-static size_t ringbuf_obj_size;
-static size_t ringbuf_worker_size;
-
-static void
-test_wraparound(void) {
-    const size_t n = 1000;
-    ringbuf_t *r = malloc(ringbuf_obj_size);
-    ringbuf_worker_t *w;
-    size_t len, woff;
-    ssize_t off;
-
-    /* Size n, but only (n - 1) can be produced at a time. */
-    ringbuf_setup(r, MAX_WORKERS, n);
-    w = ringbuf_register(r, 0);
-
-    /* Produce (n / 2 + 1) and then attempt another (n / 2 - 1). */
-    off = ringbuf_acquire(r, w, n / 2 + 1);
-    assert(off == 0);
-    ringbuf_produce(r, w);
-
-    off = ringbuf_acquire(r, w, n / 2 - 1);
-    assert(off == -1);
-
-    /* Consume (n / 2 + 1) bytes. */
-    len = ringbuf_consume(r, &woff);
-    assert(len == (n / 2 + 1) && woff == 0);
-    ringbuf_release(r, len);
-
-    /* All consumed, attempt (n / 2 + 1) now. */
-    off = ringbuf_acquire(r, w, n / 2 + 1);
-    assert(off == -1);
-
-    /* However, wraparound can be successful with (n / 2). */
-    off = ringbuf_acquire(r, w, n / 2);
-    assert(off == 0);
-    ringbuf_produce(r, w);
-
-    /* Consume (n / 2) bytes. */
-    len = ringbuf_consume(r, &woff);
-    assert(len == (n / 2) && woff == 0);
-    ringbuf_release(r, len);
-
-    ringbuf_unregister(r, w);
-    free(r);
-}
-
-int main() {
-    ringbuf_get_sizes(MAX_WORKERS, &ringbuf_obj_size, &ringbuf_worker_size);
-    test_wraparound();
-}
-#endif

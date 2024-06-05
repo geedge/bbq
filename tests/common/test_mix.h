@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-05 14:07:47
+ * @LastEditTime: 2024-06-05 18:05:17
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -57,6 +57,7 @@ typedef struct {
 
 typedef struct {
     test_ring_type ring_type; // ring buffer类型
+    uint32_t burst_cnt;
     uint32_t producer_cnt;    // 生产者个数
     uint32_t consumer_cnt;    // 消费者个数
     test_workload_e workload; // 负载模式
@@ -98,7 +99,7 @@ typedef enum {
 
 extern test_time_metric test_clock_time_get();
 extern test_time_metric test_clock_time_sub(test_time_metric now, test_time_metric last);
-extern int test_load_config(const char *config, const char *ring_type, test_cfg *cfg);
+extern int test_load_config(const char *config, const char *ring_type, uint32_t burst_cnt, test_cfg *cfg);
 extern test_workload_e test_workload_str2enum(const char *workload);
 extern test_ring_type test_ring_type_str2enum(const char *ring_type);
 extern bool test_clock_time_is_zero(test_time_metric *metric);

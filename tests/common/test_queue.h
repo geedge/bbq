@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-05 17:30:19
+ * @LastEditTime: 2024-06-05 18:40:13
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -15,12 +15,16 @@
 typedef void (*test_ring_free_f)(void *ring);
 typedef int (*test_ring_enqueue_f)(void *ring, void *obj);
 typedef int (*test_ring_dequeue_f)(void *ring, void *obj);
+typedef uint32_t (*test_enqueue_burst_f)(void *ring, void *obj_table, size_t n, unsigned int flags);
+typedef uint32_t (*test_dequeue_burst_f)(void *ring, void *obj_table, uint32_t n);
 
 typedef struct {
     test_ring_type ring_type;
     test_ring_free_f ring_free_f;
     test_ring_enqueue_f enqueue_f;
     test_ring_dequeue_f dequeue_f;
+    test_enqueue_burst_f enqueue_burst_f;
+    test_dequeue_burst_f dequeue_burst_f;
     void *ring;
 } test_queue_s;
 
@@ -44,8 +48,6 @@ typedef struct {
 
 typedef struct {
     pthread_t thread_id;
-    test_thread_arg_s *arg;
-    test_data *simple_data;
     test_time_metric metric_start;
     test_time_metric metric_end;
     uint64_t run_times;
@@ -54,6 +56,9 @@ typedef struct {
     uint64_t op_ok_latency_ns;  // 成功操作的时延
     uint64_t op_err_latency_ns; // 操作失败的时延， 如满队入队，空队出队
     uint64_t data_error_cnt;    // 发生过至少一次数据不一致的次数
+    test_thread_arg_s *arg;
+    size_t simple_data_cnt;
+    test_data **simple_data;
 } test_exit_data;
 
 typedef struct {

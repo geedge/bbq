@@ -1,7 +1,7 @@
 /*
  * @Description: 描述信息
  * @Date: 2024-05-25 10:55:48
- * @LastEditTime: 2024-06-05 14:11:46
+ * @LastEditTime: 2024-06-05 18:45:47
  */
 
 #include "test_mix.h"
@@ -77,7 +77,7 @@ void test_memory_info() {
     }
 }
 
-int test_load_config(const char *config, const char *ring_type, test_cfg *cfg) {
+int test_load_config(const char *config, const char *ring_type, uint32_t burst_cnt, test_cfg *cfg) {
     // 加载配置
     dictionary *ini = iniparser_load(config);
     if (ini == NULL) {
@@ -129,10 +129,14 @@ int test_load_config(const char *config, const char *ring_type, test_cfg *cfg) {
         BBQ_ERR_LOG("unknown ring type:%d", cfg->ring.ring_type);
         return -1;
     }
-    BBQ_INFO_LOG("ring_type:%s(%u)", ring_type, cfg->ring.ring_type);
+
     cfg->run.running = true;
     cfg->run.thread_start = ATOMIC_VAR_INIT(0);
     cfg->run.producer_exit = ATOMIC_VAR_INIT(0);
+    cfg->ring.burst_cnt = burst_cnt;
+
+    BBQ_INFO_LOG("ring_type:%s(%u)", ring_type, cfg->ring.ring_type);
+    BBQ_INFO_LOG("burst_cnt:%u", burst_cnt);
     // 释放dictionary对象
     iniparser_freedict(ini);
     return 0;

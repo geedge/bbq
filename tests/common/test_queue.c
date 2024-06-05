@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-05 17:30:37
+ * @LastEditTime: 2024-06-05 18:46:20
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -42,6 +42,8 @@ int test_queue_init_bbq(test_cfg *cfg, test_queue_s *q) {
     q->ring_free_f = (test_ring_free_f)bbq_ring_free;
     q->enqueue_f = (test_ring_enqueue_f)bbq_enqueue;
     q->dequeue_f = (test_ring_dequeue_f)bbq_dequeue;
+    q->dequeue_burst_f = (test_dequeue_burst_f)bbq_dequeue_burst;
+    q->enqueue_burst_f = (test_enqueue_burst_f)bbq_enqueue_burst;
 
     return 0;
 }
@@ -75,7 +77,14 @@ test_exit_data *test_exit_data_create(test_thread_arg_s *t_arg) {
         exit(-1);
     }
 
-    exit_data->simple_data = test_data_create();
+    size_t size = t_arg->cfg->ring.burst_cnt;
+    exit_data->simple_data_cnt = size;
+    exit_data->simple_data = test_malloc(TEST_MODULE_DATA, sizeof(*exit_data->simple_data) * size);
+
+    for (int i = 0; i < size; i++) {
+        exit_data->simple_data[i] = test_data_create();
+    }
+
     if (exit_data->simple_data == NULL) {
         BBQ_ERR_LOG("malloc failed");
         exit(-1);
@@ -92,7 +101,11 @@ test_exit_data *test_exit_data_destory(test_exit_data *data) {
     test_free(TEST_MODULE_COMMON, data->arg);
     test_free(TEST_MODULE_COMMON, data);
 
-    test_data_destory(data->simple_data);
+    for (int i = 0; i < data->simple_data_cnt; i++) {
+        test_data_destory(data->simple_data[i]);
+    }
+
+    test_free(TEST_MODULE_DATA, data->simple_data);
 }
 
 test_data *test_data_create() {

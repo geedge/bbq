@@ -1,7 +1,7 @@
 #!/bin/bash
 ###
 # @Author: liuyu
- # @LastEditTime: 2024-06-03 01:48:19
+# @LastEditTime: 2024-06-05 18:43:28
 # @Email: liuyu@geedgenetworks.com
 # @Describe: TODO
 ###
@@ -9,9 +9,10 @@
 ring_type_arr=("bbq" "dpdk")
 
 # 检查参数数量
-if [ "$#" -ne 3 ]; then
-    echo "Usage: $0 <path_to_benchmark> <path_to_config_directory> <ring_type>"
-    echo "Where <ring_type> is one of: ${my_array[*]} or input all" # 列出可选的 ring_type
+if [ "$#" -ne 4 ]; then
+    echo "Usage: $0 <path_to_benchmark> <path_to_config_directory> <ring_type> <burst_cnt>"
+    echo "   <ring_type> is one of: ${my_array[*]} or input all"           # 列出可选的 ring_type
+    echo "   <burst_cnt> : The number of obj enqueue or dequeue at a time" # 列出可选的 ring_type
     exit 1
 fi
 
@@ -19,6 +20,12 @@ fi
 BENCHMARK_PATH=$1
 CONFIG_DIR=$2
 RING_TYPE=$3
+BURST_CNT=$4
+
+if [ "$BURST_CNT" -le 0 ]; then
+    echo "burst_cnt need >=1"
+    exit 1
+fi
 
 function exec_benchmark_ring_type() {
     local ini="$1"
@@ -26,10 +33,10 @@ function exec_benchmark_ring_type() {
 
     # 如果以perf开头的配置文件，还要执行perf统计
     if [[ $(basename "$ini") == perf* ]]; then
-        echo "perf stat -a -e L1-dcache-loads,L1-dcache-load-misses,cache-references,cache-misses "$BENCHMARK_PATH" "$ini" "$ring""
-        perf stat -a -e L1-dcache-loads,L1-dcache-load-misses,cache-references,cache-misses "$BENCHMARK_PATH" "$ini" "$ring"
+        echo perf stat -a -e L1-dcache-loads,L1-dcache-load-misses,cache-references,cache-misses "$BENCHMARK_PATH" "$ini" "$ring" "$BURST_CNT"
+        perf stat -a -e L1-dcache-loads,L1-dcache-load-misses,cache-references,cache-misses "$BENCHMARK_PATH" "$ini" "$ring" "$BURST_CNT"
     else
-        "$BENCHMARK_PATH" "$ini" "$ring"
+        "$BENCHMARK_PATH" "$ini" "$ring" "$BURST_CNT"
     fi
 }
 
