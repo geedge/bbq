@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-05 23:08:14
+ * @LastEditTime: 2024-06-05 23:13:56
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -118,11 +118,13 @@ void test_data_destory(test_data** data, size_t cnt) {
     test_free(TEST_MODULE_DATA, data);
 }
 
-int test_exec_enqueue(test_queue_s* q, void* obj, test_time_metric* op_use_diff) {
+int test_exec_enqueue(test_queue_s* q, test_data** data, size_t simple_data_cnt, test_time_metric* op_use_diff) {
     int ret = 0;
 
     test_time_metric op_use_start = test_clock_time_get();
-    ret = q->enqueue_f(q->ring, obj);
+    if (simple_data_cnt == 1) {
+        ret = q->enqueue_f(q->ring, data[0]);
+    }
     *op_use_diff = test_clock_time_sub(test_clock_time_get(), op_use_start);
 
     return ret;
@@ -166,7 +168,7 @@ void* test_thread_producer_start(void* arg) {
         }
 
         if (cfg->ring.workload == TEST_WORKLOAD_SIMPLE) {
-            ret = test_exec_enqueue(q, exit_data->simple_data[0], &op_latency);
+            ret = test_exec_enqueue(q, exit_data->simple_data, exit_data->simple_data_cnt, &op_latency);
         } else {
             test_data** data = test_data_create(1);
             if (data == NULL) {
@@ -175,7 +177,7 @@ void* test_thread_producer_start(void* arg) {
             }
             data[0]->enqueue_time = test_clock_time_get();
             data[0]->data = TEST_DATA_MAGIC;
-            ret = test_exec_enqueue(q, data[0], &op_latency);
+            ret = test_exec_enqueue(q, data, 1, &op_latency);
             if (ret != 0) {
                 test_free(TEST_MODULE_DATA, data[0]);
             }

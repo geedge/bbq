@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-05 23:05:41
+ * @LastEditTime: 2024-06-05 23:14:27
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -83,7 +83,7 @@ extern void test_check_run_time(test_cfg* cfg);
 extern void* test_thread_consumer_start(void* arg);
 extern void* test_thread_producer_start(void* arg);
 extern int test_exec_dequeue(test_queue_s* q, void* obj, test_time_metric* op_use_diff);
-extern int test_exec_enqueue(test_queue_s* q, void* obj, test_time_metric* op_use_diff);
+extern int test_exec_enqueue(test_queue_s* q, test_data** data, size_t simple_data_cnt, test_time_metric* op_use_diff);
 extern test_exit_data* test_exit_data_destory(test_exit_data* data);
 extern test_exit_data* test_exit_data_create(test_thread_arg_s* t_arg);
 extern void test_wait_all_threads_ready(test_cfg* cfg);
