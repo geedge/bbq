@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-04 22:04:58
+ * @LastEditTime: 2024-06-05 15:28:05
  * @Email: liuyu@geedgenetworks.com
  * @Describe: bbq（Block-based Bounded Queue）实现
  * 参考：https://www.usenix.org/system/files/atc22-wang-jiawei.pdf
@@ -12,7 +12,7 @@
 #include <string.h>
 
 extern bbq_queue_state_s allocate_entry(bbq_queue_s *q, bbq_block_s *block);
-extern void commit_entry(bbq_entry_desc_s *e, void *data, size_t obj_size);
+extern void commit_entry(bbq_queue_s *q, bbq_entry_desc_s *e, void *data);
 extern bbq_queue_state_s advance_phead(bbq_queue_s *q, uint64_t ph);
 extern bbq_queue_state_s reserve_entry(bbq_queue_s *q, bbq_block_s *block);
 extern bool consume_entry(bbq_queue_s *q, bbq_entry_desc_s *e, void *deq_data);
@@ -74,7 +74,7 @@ int block_init(bbq_queue_s *q, bbq_block_s *block, bool cursor_init) {
         block->committed = ATOMIC_VAR_INIT(q->bs);
         block->allocated = ATOMIC_VAR_INIT(q->bs);
         block->reserved = ATOMIC_VAR_INIT(q->bs);
-        if (q->policy == BBQ_RETRY_NEW) {
+        if (BBQ_POLIC_RETRY_NEW(q->flags)) {
             block->consumed = ATOMIC_VAR_INIT(q->bs);
         } else {
             block->consumed = ATOMIC_VAR_INIT(0);
@@ -113,7 +113,7 @@ unsigned ceil_log2(uint64_t x) {
 }
 
 /* 创建消息队列，bn和bs必须是2的N次幂，socket_id用于多numa分配内存，free_func先设置NULL */
-bbq_queue_s *bbq_ring_create_bnbs_with_socket(uint32_t bn, uint32_t bs, size_t obj_size, int socket_id, bbq_policy_e policy) {
+bbq_queue_s *bbq_ring_create_bnbs_with_socket(uint32_t bn, uint32_t bs, size_t obj_size, int socket_id, unsigned int flags) {
     int ret = 0;
     bool numa_enable = true;
 
@@ -132,6 +132,13 @@ bbq_queue_s *bbq_ring_create_bnbs_with_socket(uint32_t bn, uint32_t bs, size_t o
         socket_id = BBQ_INVALID_SOCKET;
     }
 
+    if (BBQ_COPY_POINTER(flags)) {
+        obj_size = sizeof(uintptr_t);
+    } else if (obj_size == 0) {
+        BBQ_ERR_LOG("obj_size is 0, and flag BBQ_COPY_POINTER is not set");
+        return NULL;
+    }
+
     bbq_queue_s *q = bbq_malloc(BBQ_MODULE_QUEUE, socket_id, sizeof(*q));
     if (q == NULL) {
         BBQ_ERR_LOG("malloc for bbq queue error");
@@ -145,7 +152,7 @@ bbq_queue_s *bbq_ring_create_bnbs_with_socket(uint32_t bn, uint32_t bs, size_t o
     q->socket_id = socket_id;
     q->phead = 0;
     q->chead = 0;
-    q->policy = policy;
+    q->flags = flags;
 
     q->blocks = bbq_malloc(BBQ_MODULE_QUEUE_BLOCK_NB, socket_id, bn * sizeof(*q->blocks));
     if (q->blocks == NULL) {
@@ -178,12 +185,12 @@ error:
 }
 
 /* 创建消息队列，bn和bs必须是2的N次幂，free_func先设置NULL */
-bbq_queue_s *bbq_ring_create_bnbs(uint32_t bn, uint32_t bs, size_t obj_size, bbq_policy_e policy) {
-    return bbq_ring_create_bnbs_with_socket(bn, bs, obj_size, BBQ_INVALID_SOCKET, policy);
+bbq_queue_s *bbq_ring_create_bnbs(uint32_t bn, uint32_t bs, size_t obj_size, unsigned int flags) {
+    return bbq_ring_create_bnbs_with_socket(bn, bs, obj_size, BBQ_INVALID_SOCKET, flags);
 }
 
 /* 创建消息队列，count必须大于1，且是2的N次幂，bn和bs将根据count值自动计算，socket_id用于多numa分配内存，free_func先设置NULL */
-bbq_queue_s *bbq_ring_create_with_socket(uint32_t count, size_t obj_size, int socket_id, bbq_policy_e policy) {
+bbq_queue_s *bbq_ring_create_with_socket(uint32_t count, size_t obj_size, int socket_id, unsigned int flags) {
     if (bbq_check_power_of_two(count) == false || count == 1) {
         BBQ_ERR_LOG("bbq entries number must be power of two and greater than 1, now is  :%lu", count);
         return NULL;
@@ -191,13 +198,13 @@ bbq_queue_s *bbq_ring_create_with_socket(uint32_t count, size_t obj_size, int so
 
     uint32_t bn = bbq_blocks_calc(count);
     uint32_t bs = count / bn;
-    return bbq_ring_create_bnbs_with_socket(bn, bs, obj_size, socket_id, policy);
+    return bbq_ring_create_bnbs_with_socket(bn, bs, obj_size, socket_id, flags);
 }
 
 /* 创建消息队列，count必须大于1，且是2的N次幂，bn和bs将根据count值自动计算，free_func先设置NULL */
-bbq_queue_s *bbq_ring_create(uint32_t count, size_t obj_size, bbq_policy_e policy) {
+bbq_queue_s *bbq_ring_create(uint32_t count, size_t obj_size, unsigned int flags) {
     // 传入无效socket_id，将使用malloc分配内存
-    return bbq_ring_create_with_socket(count, obj_size, BBQ_INVALID_SOCKET, policy);
+    return bbq_ring_create_with_socket(count, obj_size, BBQ_INVALID_SOCKET, flags);
 }
 
 /* 释放消息队列，与bbq_ring_create系列接口成对*/
@@ -230,7 +237,7 @@ int bbq_enqueue(bbq_queue_s *q, void *data) {
 
         switch (state.state) {
         case BBQ_ALLOCATED:
-            commit_entry(&state.e, data, q->obj_size);
+            commit_entry(q, &state.e, data);
             return BBQ_OK;
         case BBQ_BLOCK_DONE:
             ps = advance_phead(q, ph);
@@ -290,8 +297,10 @@ int bbq_dequeue(bbq_queue_s *q, void *deq_data) {
 /* 将多个对象从一个环形队列ring取出，直到达到最大数量，或是出队失败 */
 uint32_t bbq_dequeue_burst(bbq_queue_s *q, void *obj_table, uint32_t n) {
     uint32_t cnt = 0;
+    void *obj = NULL;
+
     for (cnt = 0; cnt < n; cnt++) {
-        void *obj = ((uint8_t *)obj_table) + q->obj_size * cnt;
+        obj = (obj == NULL ? obj_table : obj + q->obj_size);
         if (BBQ_OK != bbq_dequeue(q, obj)) {
             return cnt;
         }
@@ -302,10 +311,17 @@ uint32_t bbq_dequeue_burst(bbq_queue_s *q, void *obj_table, uint32_t n) {
 
 /* 尝试一次入队多个数据，直到达到最大数量，或是入队失败 */
 uint32_t
-bbq_enqueue_burst(bbq_queue_s *q, void *obj_table, unsigned int n) {
+bbq_enqueue_burst(bbq_queue_s *q, void *obj_table, size_t n, unsigned int flags) {
     uint32_t cnt = 0;
+    void *obj = NULL;
+
     for (cnt = 0; cnt < n; cnt++) {
-        void *obj = ((uint8_t *)obj_table) + q->obj_size * cnt;
+        if (BBQ_ARRAY_1D(flags)) {
+            obj = (obj == NULL ? obj_table : obj + q->obj_size);
+        } else {
+            obj = ((void **)obj_table)[cnt];
+        }
+
         if (BBQ_OK != bbq_enqueue(q, obj)) {
             return cnt;
         }
@@ -340,8 +356,14 @@ bbq_queue_state_s allocate_entry(bbq_queue_s *q, bbq_block_s *block) {
     return state;
 }
 
-void commit_entry(bbq_entry_desc_s *e, void *data, size_t obj_size) {
-    memcpy(&(e->block->entries[e->bbq_off * obj_size]), data, obj_size);
+void commit_entry(bbq_queue_s *q, bbq_entry_desc_s *e, void *data) {
+    size_t idx = e->bbq_off * q->obj_size;
+    if (BBQ_COPY_POINTER(q->flags)) {
+        uintptr_t *uptr = (uintptr_t *)(&(e->block->entries[idx]));
+        *uptr = (uintptr_t)(data);
+    } else {
+        memcpy(&(e->block->entries[idx]), data, q->obj_size);
+    }
     atomic_fetch_add(&e->block->committed, 1);
 }
 
@@ -352,9 +374,7 @@ bbq_queue_state_s advance_phead(bbq_queue_s *q, uint64_t ph) {
 
     uint64_t cur, reserved;
     bbq_queue_state_s state = {0};
-    switch (q->policy) {
-    case BBQ_RETRY_NEW:
-        // consumed
+    if (BBQ_POLIC_RETRY_NEW(q->flags)) {
         cur = atomic_load(&n_blk->consumed);
         if (bbq_cur_vsn(q, cur) < bbq_head_vsn(q, ph) || // 生产者赶上了消费者
             (bbq_cur_vsn(q, cur) == bbq_head_vsn(q, ph) && bbq_off(q, cur) != q->bs)) {
@@ -366,18 +386,13 @@ bbq_queue_state_s advance_phead(bbq_queue_s *q, uint64_t ph) {
             }
             return state;
         }
-        break;
-    case BBQ_DROP_OLD:
-        // committed
+    } else {
         cur = atomic_load(&n_blk->committed);
         // 生产者避免前进到上一轮中尚未完全提交的区块
         if (bbq_cur_vsn(q, cur) == bbq_head_vsn(q, ph) && bbq_off(q, cur) != q->bs) {
             state.state = BBQ_NOT_AVAILABLE;
             return state;
         }
-        break;
-    default:
-        break;
     }
 
     // 用head的version初始化下一个块，version在高位，version+1，idex/offset清零，如果没有被其他线程执行过，数值会高于旧值。多线程同时只更新一次。
@@ -396,7 +411,7 @@ bbq_queue_state_s reserve_entry(bbq_queue_s *q, bbq_block_s *block) {
         uint64_t reserved = atomic_load(&block->reserved);
         if (bbq_off(q, reserved) < q->bs) {
             uint64_t consumed = atomic_load(&block->consumed);
-            if (q->policy == BBQ_RETRY_NEW && bbq_cur_vsn(q, reserved) != bbq_cur_vsn(q, consumed)) {
+            if (BBQ_POLIC_RETRY_NEW(q->flags) && bbq_cur_vsn(q, reserved) != bbq_cur_vsn(q, consumed)) {
                 // consumed溢出了，这种情况只发生在BBQ_RETRY_NEW，因为BBQ_DROP_OLD模式，consumed没有用到
                 state.state = BBQ_BLOCK_DONE;
                 state.vsn = bbq_cur_vsn(q, reserved);
@@ -439,22 +454,23 @@ bbq_queue_state_s reserve_entry(bbq_queue_s *q, bbq_block_s *block) {
 }
 
 bool consume_entry(bbq_queue_s *q, bbq_entry_desc_s *e, void *deq_data) {
-    memcpy(deq_data, &(e->block->entries[e->bbq_off * q->obj_size]), q->obj_size);
+    size_t idx = e->bbq_off * q->obj_size;
+    if (BBQ_COPY_POINTER(q->flags)) {
+        uintptr_t *uptr = (uintptr_t *)(&(e->block->entries[idx]));
+        *((void **)deq_data) = (void *)(*uptr);
+    } else {
+        memcpy(deq_data, &(e->block->entries[idx]), q->obj_size);
+    }
 
     uint64_t allocated;
-    switch (q->policy) {
-    case BBQ_RETRY_NEW:
+    if (BBQ_POLIC_RETRY_NEW(q->flags)) {
         atomic_fetch_add(&e->block->consumed, 1);
-        break;
-    case BBQ_DROP_OLD:
+    } else {
         allocated = atomic_load(&e->block->allocated);
         // 预留的entry所在的块，已经被新生产的数据赶上了
         if (bbq_cur_vsn(q, allocated) != e->vsn) {
             return false;
         }
-        break;
-    default:
-        break;
     }
 
     return true;
@@ -464,24 +480,19 @@ bool advance_chead(bbq_queue_s *q, uint64_t ch, uint64_t ver) {
     bbq_block_s *n_blk = &(q->blocks[(bbq_idx(q, ch) + 1) & q->idx_mask]);
 
     uint64_t committed = atomic_load(&n_blk->committed);
-    switch (q->policy) {
-    case BBQ_RETRY_NEW:
+    if (BBQ_POLIC_RETRY_NEW(q->flags)) {
         if (bbq_cur_vsn(q, committed) != bbq_head_vsn(q, ch) + 1) {
             // 消费者追上了生产者，下一块还未开始生产
             return false;
         }
         fetch_max(&n_blk->consumed, set_cur_vsn(q, bbq_head_vsn(q, ch) + 1));
         fetch_max(&n_blk->reserved, set_cur_vsn(q, bbq_head_vsn(q, ch) + 1));
-        break;
-    case BBQ_DROP_OLD:
+    } else {
         // 通过检查下一个块的版本是否大于或等于当前块来保证 FIFO 顺序.
         // 第一个块是一个特殊情况，因为与其他块相比，它的版本总是相差一个。因此，如果 ch.bbq_idx == 0，我们在比较中加 1
         if (bbq_cur_vsn(q, committed) < ver + (bbq_idx(q, ch) == 0))
             return false;
         fetch_max(&n_blk->reserved, set_cur_vsn(q, bbq_cur_vsn(q, committed)));
-        break;
-    default:
-        break;
     }
 
     fetch_max(&q->chead, ch + 1);

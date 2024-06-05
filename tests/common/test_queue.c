@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-04 22:50:20
+ * @LastEditTime: 2024-06-05 11:05:30
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -23,16 +23,16 @@ int test_queue_init_bbq(test_cfg *cfg, test_queue_s *q) {
     size_t obj_size = sizeof(test_data *);
 
     if (cfg->ring.block_count == 0) {
-        q->ring = bbq_ring_create_with_socket(cfg->ring.entries_cnt, obj_size, 0, BBQ_RETRY_NEW);
+        q->ring = bbq_ring_create_with_socket(cfg->ring.entries_cnt, obj_size, 0, BBQ_F_POLICY_RETRY_NEW | BBQ_F_COPY_POINTER);
     } else {
         q->ring = bbq_ring_create_bnbs_with_socket(cfg->ring.block_count,
                                                    cfg->ring.entries_cnt / cfg->ring.block_count,
                                                    obj_size,
-                                                   0, BBQ_RETRY_NEW);
+                                                   0, 0);
     }
 
     if (q->ring == NULL) {
-        BBQ_ERR_LOG("bbq_ring_create_with_socket failed");
+        BBQ_ERR_LOG("bbq create queue failed");
         return BBQ_NULL_PTR;
     }
 
@@ -148,7 +148,7 @@ void *test_thread_producer_start(void *arg) {
         }
 
         if (cfg->ring.workload == TEST_WORKLOAD_SIMPLE) {
-            ret = test_exec_enqueue(q, &simple_data, &op_latency);
+            ret = test_exec_enqueue(q, simple_data, &op_latency);
         } else {
             test_data *data = test_data_create();
             if (data == NULL) {

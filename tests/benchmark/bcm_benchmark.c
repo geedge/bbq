@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-04 15:25:26
+ * @LastEditTime: 2024-06-04 23:31:57
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -103,7 +103,7 @@ int main(int argc, char *argv[]) {
         config = argv[1];
         ring_type = argv[2];
     } else {
-        config = "/root/code/c/bbq-ly/tests/benchmark/config/compare/perf/case9_simple_mpmc.ini";
+        config = "/root/code/c/bbq-ly/tests/benchmark/config/compare/general/case1_simple_spsc.ini";
         // ring_type = "dpdk";
         ring_type = "bbq";
         BBQ_ERR_LOG("use default config, ringt_type:bbq config:%s", config);

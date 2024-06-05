@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu@geedgenetworks.com
- * @LastEditTime: 2024-06-04 21:56:33
+ * @LastEditTime: 2024-06-05 16:08:19
  * @Describe: bbq（Block-based Bounded Queue）头文件
  * 参考：https://www.usenix.org/system/files/atc22-wang-jiawei.pdf
  */
@@ -59,21 +59,27 @@ typedef struct {
     };
 } bbq_queue_state_s;
 
-typedef enum {
-    BBQ_DROP_OLD, // 入队时队列满了，则覆盖旧的entry
-    BBQ_RETRY_NEW // 入队时队列满了，则本次入队失败
-} bbq_policy_e;
+#define BBQ_F_DEFAULT 0x0
+// flags 第一位控制入队策略，默认是retry new
+#define BBQ_F_POLICY_DROP_OLD 0x0001
+#define BBQ_F_POLICY_RETRY_NEW BBQ_F_DEFAULT
+#define BBQ_POLIC_DROP_OLD(flags) (flags & BBQ_F_POLICY_DROP_OLD)
+#define BBQ_POLIC_RETRY_NEW(flags) (!(flags & BBQ_F_POLICY_DROP_OLD))
 
-typedef void (*drop_old_func)(void *arg);
+// flags 第二位控制入队时的数据拷贝策略，默认是copy pointer
+#define BBQ_F_COPY_VALUE 0x0002
+#define BBQ_F_COPY_POINTER BBQ_F_DEFAULT
+#define BBQ_COPY_VALUE(flags) (flags & BBQ_F_COPY_VALUE)
+#define BBQ_COPY_POINTER(flags) (!(flags & BBQ_F_COPY_VALUE))
 
 typedef struct {
-    int socket_id; // 在哪个socket_id上使用libnuma分配内存，-1表示无效，使用malloc分配
-    bbq_policy_e policy;
+    int socket_id;   // 在哪个socket_id上使用libnuma分配内存，-1表示无效，使用malloc分配
     size_t bs;       // 每个block里entries成员的大小
     size_t bn;       // blocks个数
     size_t obj_size; // 队列成员的大小
-    unsigned idx_bits;
-    unsigned off_bits;
+    unsigned int flags;
+    unsigned int idx_bits;
+    unsigned int off_bits;
     uint64_t idx_mask;
     uint64_t off_mask;
 
@@ -87,27 +93,24 @@ typedef struct {
  * bbq_ring_create系列接口，用于创建并返回bbq队列结构体，功能类似，区别在于是否需要
  * 指定socket，是否手动手动指定块个数（bn），块的大小（bs），即每个块包含的条目数。
  * @param count
- * 队列所有条目的个数（总容量），必须大于1，且是2的N次方。将根据公式自动计算块的个数，以及块的大小。
- * 计算公式：log2(blocks) = max(1, ⌊log2(count)/4⌋)   注：⌊ ⌋代表向下取整。
- * @param free_func
- * NULL：retry-new模式，队列满时再入队将会失败。
- * 非NULL：drop-old模式，指向一个用于释放未及时出队列而被覆盖的数据。
- * 目前drop-old模式还支持的不，作为接口先预留，不论传什么目前都为retry-new模式。
+ *  队列所有条目的个数（总容量），必须大于1，且是2的N次方。将根据公式自动计算块的个数，以及块的大小。
+ *  计算公式：log2(blocks) = max(1, ⌊log2(count)/4⌋)   注：⌊ ⌋代表向下取整。
+ * @param flags
+ *  第一位控制入队策略，默认是retry new模式，即队列满了当前入队失败。如果要设置为drop old模式，需要flags|BBQ_F_DROP_OLD
+ *  第二位控制入队列时，传入的时候指针，还是指针指向的值。默认传入指针，如果要传入指向的值，需要设置flags|BBQ_F_COPY_VALUE
+ * @param obj_size
+ *  队列里每个成员的存储大小，如存储int类型数据：sizeof(int)
  * @param socket_id
- * socket ID，多numa架构下，队列里的空间将针对指定socket调用libnuma库函数分配内存。
- * 当检测到不支持多numa，将转为malloc分配内存。
- * @param bn
- * block number，块的个数，必须是2的N次方。
- * @param bs
- * block size，块的大小，即每个块包含的条目数，必须是2的N次方。
+ *  socket ID，多numa架构下，队列里的空间将针对指定socket调用libnuma库函数分配内存。
+ *  当检测到不支持多numa，将转为malloc分配内存。
  * @return
- * 非NULL：消息队列结构体指针，用于后续出队入队等操作。
- * NULL：创建失败。
+ *  非NULL：消息队列结构体指针，用于后续出队入队等操作。
+ *  NULL：创建失败。
  */
-extern bbq_queue_s *bbq_ring_create(uint32_t count, size_t obj_size, bbq_policy_e policy);
-extern bbq_queue_s *bbq_ring_create_with_socket(uint32_t count, size_t obj_size, int socket_id, bbq_policy_e policy);
-extern bbq_queue_s *bbq_ring_create_bnbs(uint32_t bn, uint32_t bs, size_t obj_size, bbq_policy_e policy);
-extern bbq_queue_s *bbq_ring_create_bnbs_with_socket(uint32_t bn, uint32_t bs, size_t obj_size, int socket_id, bbq_policy_e policy);
+extern bbq_queue_s *bbq_ring_create(uint32_t count, size_t obj_size, unsigned int flags);
+extern bbq_queue_s *bbq_ring_create_with_socket(uint32_t count, size_t obj_size, int socket_id, unsigned int flags);
+extern bbq_queue_s *bbq_ring_create_bnbs(uint32_t bn, uint32_t bs, size_t obj_size, unsigned int flags);
+extern bbq_queue_s *bbq_ring_create_bnbs_with_socket(uint32_t bn, uint32_t bs, size_t obj_size, int socket_id, unsigned int flags);
 
 /**
  * 用于释放消息队列，与bbq_ring_create系列函数成对。
@@ -152,7 +155,6 @@ extern int bbq_dequeue(bbq_queue_s *q, void *deq_data);
  * @param q
  *   队列指针
  * @param obj_table
- *   出队数组的首地址，例如 int a[10] 或 int *a[10]，都传入(void *)a
  * @param n
  *   obj_table的成员个数
  * @return
@@ -160,19 +162,24 @@ extern int bbq_dequeue(bbq_queue_s *q, void *deq_data);
  */
 extern uint32_t bbq_dequeue_burst(bbq_queue_s *q, void *obj_table, uint32_t n);
 
+// flags 第一位控制传入的是一维数组还是二维数组
+#define BBQ_F_ARRAY_1D 0x0001
+#define BBQ_F_ARRAY_2D BBQ_F_DEFAULT
+#define BBQ_ARRAY_1D(flags) (flags & BBQ_F_ARRAY_1D)
+#define BBQ_ARRAY_2D(flags) (!(flags & BBQ_F_ARRAY_1D))
 /**
  * 尝试一次入队多个数据，直到达到最大数量，或是入队失败
  *
  * @param q
  *   队列指针
  * @param obj_table
- *   入队数组的首地址，例如 int a[10] 或 int *a[10]，都传入(void *)a
+ * @param flags
  * @param n
  *   obj_table的成员个数
  * @return
  *   实际入队个数
  */
-uint32_t bbq_enqueue_burst(bbq_queue_s *q, void *obj_table, unsigned int n);
+uint32_t bbq_enqueue_burst(bbq_queue_s *q, void *obj_table, size_t n, unsigned int flags);
 
 // -----------------------------用于内存测试-------------------------------
 // 当BBQ_MEMORY宏定义开关打开，将对内存分配释放进行统计，方便排查内存泄漏

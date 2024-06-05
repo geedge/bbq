@@ -1,7 +1,7 @@
 /*
  * @Description: 描述信息
  * @Date: 2024-05-25 10:55:48
- * @LastEditTime: 2024-06-04 21:15:55
+ * @LastEditTime: 2024-06-05 14:11:46
  */
 
 #include "test_mix.h"
@@ -222,28 +222,19 @@ char *test_ring_type_enum2str(test_ring_type ring_type) {
     }
 }
 
-uint16_t **test_table_create(uint32_t count) {
-    uint16_t **table = test_malloc(TEST_MODULE_TABLE, sizeof(int **) * count);
-    memset(table, 0, sizeof(int **) * count);
-    return table;
-}
-
-void test_table_destory(uint16_t **table) {
-    test_free(TEST_MODULE_TABLE, table);
-}
-
 uint16_t **test_enqueue_table_create(uint32_t count) {
-    uint16_t **table = test_table_create(count);
+    uint16_t **table = test_malloc(TEST_MODULE_TABLE, sizeof(uint16_t **) * count);
     if (table == NULL) {
         return NULL;
     }
+    memset(table, 0, sizeof(uint16_t **) * count);
 
     for (uint32_t i = 0; i < count; i++) {
-        table[i] = test_malloc(TEST_MODULE_TABLE_OBJ, sizeof(int *));
+        table[i] = test_malloc(TEST_MODULE_TABLE, sizeof(uint16_t));
         if (table[i] == NULL) {
             goto error;
         }
-        *((int *)table[i]) = TEST_TABLE_DATA_MAGIC;
+        *table[i] = TEST_TABLE_DATA_MAGIC;
     }
 
     return table;
@@ -252,12 +243,12 @@ error:
     if (table) {
         for (uint32_t i = 0; i < count; i++) {
             if (table[i] != NULL) {
-                test_free(TEST_MODULE_TABLE_OBJ, table[i]);
+                test_free(TEST_MODULE_TABLE, table[i]);
             } else {
                 break;
             }
         }
-        test_table_destory(table);
+        test_free(TEST_MODULE_TABLE, table);
     }
     return NULL;
 }
@@ -268,7 +259,7 @@ void test_enqueue_table_destory(uint16_t **table, uint32_t count) {
     }
 
     for (uint32_t i = 0; i < count; i++) {
-        test_free(TEST_MODULE_TABLE_OBJ, table[i]);
+        test_free(TEST_MODULE_TABLE, table[i]);
     }
     test_free(TEST_MODULE_TABLE, table);
 }
