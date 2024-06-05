@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-05 11:05:30
+ * @LastEditTime: 2024-06-05 17:30:37
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -20,7 +20,7 @@ void test_busy_loop(uint32_t busy_loop) {
 
 int test_queue_init_bbq(test_cfg *cfg, test_queue_s *q) {
     bbq_queue_s *ring;
-    size_t obj_size = sizeof(test_data *);
+    size_t obj_size = sizeof(test_data);
 
     if (cfg->ring.block_count == 0) {
         q->ring = bbq_ring_create_with_socket(cfg->ring.entries_cnt, obj_size, 0, BBQ_F_POLICY_RETRY_NEW | BBQ_F_COPY_POINTER);
@@ -28,7 +28,7 @@ int test_queue_init_bbq(test_cfg *cfg, test_queue_s *q) {
         q->ring = bbq_ring_create_bnbs_with_socket(cfg->ring.block_count,
                                                    cfg->ring.entries_cnt / cfg->ring.block_count,
                                                    obj_size,
-                                                   0, 0);
+                                                   0, BBQ_F_POLICY_RETRY_NEW | BBQ_F_COPY_POINTER);
     }
 
     if (q->ring == NULL) {
@@ -75,6 +75,11 @@ test_exit_data *test_exit_data_create(test_thread_arg_s *t_arg) {
         exit(-1);
     }
 
+    exit_data->simple_data = test_data_create();
+    if (exit_data->simple_data == NULL) {
+        BBQ_ERR_LOG("malloc failed");
+        exit(-1);
+    }
     exit_data->arg = t_arg;
     exit_data->thread_id = pthread_self();
     exit_data->latency_ns = 0;
@@ -86,6 +91,8 @@ test_exit_data *test_exit_data_create(test_thread_arg_s *t_arg) {
 test_exit_data *test_exit_data_destory(test_exit_data *data) {
     test_free(TEST_MODULE_COMMON, data->arg);
     test_free(TEST_MODULE_COMMON, data);
+
+    test_data_destory(data->simple_data);
 }
 
 test_data *test_data_create() {
@@ -127,7 +134,6 @@ void *test_thread_producer_start(void *arg) {
     test_cfg *cfg = t_arg->cfg;
     test_queue_s *q = t_arg->q;
     test_exit_data *exit_data = test_exit_data_create(t_arg);
-    test_data *simple_data = test_data_create();
 
     char thread_name[128] = {0};
     uint64_t op_ok_latency_ns = 0;
@@ -148,7 +154,7 @@ void *test_thread_producer_start(void *arg) {
         }
 
         if (cfg->ring.workload == TEST_WORKLOAD_SIMPLE) {
-            ret = test_exec_enqueue(q, simple_data, &op_latency);
+            ret = test_exec_enqueue(q, exit_data->simple_data, &op_latency);
         } else {
             test_data *data = test_data_create();
             if (data == NULL) {
@@ -180,7 +186,6 @@ void *test_thread_producer_start(void *arg) {
 
     exit_data->op_ok_latency_ns = op_ok_latency_ns;
     exit_data->op_err_latency_ns = op_err_latency_ns;
-    test_data_destory(simple_data);
     atomic_fetch_add(&cfg->run.producer_exit, 1);
 
     BBQ_DBG_LOG("producer-----> en_ok:%lu", ok_cnt);

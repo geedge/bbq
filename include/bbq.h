@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu@geedgenetworks.com
- * @LastEditTime: 2024-06-05 16:08:19
+ * @LastEditTime: 2024-06-05 16:58:19
  * @Describe: bbq（Block-based Bounded Queue）头文件
  * 参考：https://www.usenix.org/system/files/atc22-wang-jiawei.pdf
  */
@@ -73,10 +73,11 @@ typedef struct {
 #define BBQ_COPY_POINTER(flags) (!(flags & BBQ_F_COPY_VALUE))
 
 typedef struct {
-    int socket_id;   // 在哪个socket_id上使用libnuma分配内存，-1表示无效，使用malloc分配
-    size_t bs;       // 每个block里entries成员的大小
-    size_t bn;       // blocks个数
-    size_t obj_size; // 队列成员的大小
+    int socket_id; // 在哪个socket_id上使用libnuma分配内存，-1表示无效，使用malloc分配
+    size_t bs;     // 每个block里entries成员的大小
+    size_t bn;     // blocks个数
+    size_t obj_size;
+    size_t entry_size;
     unsigned int flags;
     unsigned int idx_bits;
     unsigned int off_bits;

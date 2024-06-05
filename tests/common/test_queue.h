@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-04 22:48:22
+ * @LastEditTime: 2024-06-05 17:30:19
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -45,6 +45,7 @@ typedef struct {
 typedef struct {
     pthread_t thread_id;
     test_thread_arg_s *arg;
+    test_data *simple_data;
     test_time_metric metric_start;
     test_time_metric metric_end;
     uint64_t run_times;

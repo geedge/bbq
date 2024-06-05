@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-05 15:28:05
+ * @LastEditTime: 2024-06-05 17:20:13
  * @Email: liuyu@geedgenetworks.com
  * @Describe: bbq（Block-based Bounded Queue）实现
  * 参考：https://www.usenix.org/system/files/atc22-wang-jiawei.pdf
@@ -58,7 +58,7 @@ uint32_t bbq_blocks_calc(uint32_t entries) {
 /* 块初始化 */
 int block_init(bbq_queue_s *q, bbq_block_s *block, bool cursor_init) {
     block->entries = bbq_malloc(BBQ_MODULE_QUEUE_BLOCK_ENTRY, q->socket_id,
-                                sizeof(*block->entries) * q->bs * q->obj_size);
+                                sizeof(*block->entries) * q->bs * q->entry_size);
     if (block->entries == NULL) {
         BBQ_ERR_LOG("bbq_malloc error");
         return BBQ_ALLOC_ERR;
@@ -88,7 +88,7 @@ int block_init(bbq_queue_s *q, bbq_block_s *block, bool cursor_init) {
 void block_cleanup(bbq_queue_s *q, bbq_block_s *block) {
     if (block->entries) {
         bbq_free(BBQ_MODULE_QUEUE_BLOCK_ENTRY, q->socket_id,
-                 block->entries, sizeof(*block->entries) * q->bs * q->obj_size);
+                 block->entries, sizeof(*block->entries) * q->bs * q->entry_size);
         block->entries = NULL;
     }
 }
@@ -127,16 +127,14 @@ bbq_queue_s *bbq_ring_create_bnbs_with_socket(uint32_t bn, uint32_t bs, size_t o
         return NULL;
     }
 
+    if (obj_size == 0) {
+        BBQ_ERR_LOG("obj_size is 0");
+        return NULL;
+    }
+
     if (numa_available() < 0) {
         // 不支持numa，设置
         socket_id = BBQ_INVALID_SOCKET;
-    }
-
-    if (BBQ_COPY_POINTER(flags)) {
-        obj_size = sizeof(uintptr_t);
-    } else if (obj_size == 0) {
-        BBQ_ERR_LOG("obj_size is 0, and flag BBQ_COPY_POINTER is not set");
-        return NULL;
     }
 
     bbq_queue_s *q = bbq_malloc(BBQ_MODULE_QUEUE, socket_id, sizeof(*q));
@@ -149,6 +147,11 @@ bbq_queue_s *bbq_ring_create_bnbs_with_socket(uint32_t bn, uint32_t bs, size_t o
     q->bn = bn;
     q->bs = bs;
     q->obj_size = obj_size;
+    if (BBQ_COPY_POINTER(flags)) {
+        q->entry_size = sizeof(uintptr_t);
+    } else {
+        q->entry_size = obj_size;
+    }
     q->socket_id = socket_id;
     q->phead = 0;
     q->chead = 0;
@@ -297,11 +300,19 @@ int bbq_dequeue(bbq_queue_s *q, void *deq_data) {
 /* 将多个对象从一个环形队列ring取出，直到达到最大数量，或是出队失败 */
 uint32_t bbq_dequeue_burst(bbq_queue_s *q, void *obj_table, uint32_t n) {
     uint32_t cnt = 0;
+    int ret = 0;
     void *obj = NULL;
 
     for (cnt = 0; cnt < n; cnt++) {
-        obj = (obj == NULL ? obj_table : obj + q->obj_size);
-        if (BBQ_OK != bbq_dequeue(q, obj)) {
+        if (BBQ_COPY_VALUE(q->flags)) {
+            obj = (obj == NULL ? obj_table : obj + q->obj_size);
+        } else {
+            obj = &((void **)obj_table)[cnt];
+            // printf("obj :%p %p\n", obj, &obj);
+        }
+
+        ret = bbq_dequeue(q, obj);
+        if (ret != BBQ_OK) {
             return cnt;
         }
     }
@@ -357,12 +368,12 @@ bbq_queue_state_s allocate_entry(bbq_queue_s *q, bbq_block_s *block) {
 }
 
 void commit_entry(bbq_queue_s *q, bbq_entry_desc_s *e, void *data) {
-    size_t idx = e->bbq_off * q->obj_size;
+    size_t idx = e->bbq_off * q->entry_size;
     if (BBQ_COPY_POINTER(q->flags)) {
         uintptr_t *uptr = (uintptr_t *)(&(e->block->entries[idx]));
         *uptr = (uintptr_t)(data);
     } else {
-        memcpy(&(e->block->entries[idx]), data, q->obj_size);
+        memcpy(&(e->block->entries[idx]), data, q->entry_size);
     }
     atomic_fetch_add(&e->block->committed, 1);
 }
@@ -454,12 +465,12 @@ bbq_queue_state_s reserve_entry(bbq_queue_s *q, bbq_block_s *block) {
 }
 
 bool consume_entry(bbq_queue_s *q, bbq_entry_desc_s *e, void *deq_data) {
-    size_t idx = e->bbq_off * q->obj_size;
+    size_t idx = e->bbq_off * q->entry_size;
     if (BBQ_COPY_POINTER(q->flags)) {
         uintptr_t *uptr = (uintptr_t *)(&(e->block->entries[idx]));
         *((void **)deq_data) = (void *)(*uptr);
     } else {
-        memcpy(deq_data, &(e->block->entries[idx]), q->obj_size);
+        memcpy(deq_data, &(e->block->entries[idx]), q->entry_size);
     }
 
     uint64_t allocated;
