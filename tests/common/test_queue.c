@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-05 23:01:09
+ * @LastEditTime: 2024-06-05 23:08:14
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -79,11 +79,7 @@ test_exit_data* test_exit_data_create(test_thread_arg_s* t_arg) {
 
     size_t size = t_arg->cfg->ring.burst_cnt;
     exit_data->simple_data_cnt = size;
-    exit_data->simple_data = test_malloc(TEST_MODULE_DATA, sizeof(*exit_data->simple_data) * size);
-
-    for (int i = 0; i < size; i++) {
-        exit_data->simple_data[i] = test_data_create();
-    }
+    exit_data->simple_data = test_data_create(size);
 
     if (exit_data->simple_data == NULL) {
         BBQ_ERR_LOG("malloc failed");
@@ -98,26 +94,27 @@ test_exit_data* test_exit_data_create(test_thread_arg_s* t_arg) {
 }
 
 test_exit_data* test_exit_data_destory(test_exit_data* data) {
+    test_data_destory(data->simple_data, data->simple_data_cnt);
     test_free(TEST_MODULE_COMMON, data->arg);
     test_free(TEST_MODULE_COMMON, data);
-
-    for (int i = 0; i < data->simple_data_cnt; i++) {
-        test_data_destory(data->simple_data[i]);
-    }
-
-    test_free(TEST_MODULE_DATA, data->simple_data);
 }
 
-test_data* test_data_create() {
-    test_data* simple_data = test_malloc(TEST_MODULE_DATA, sizeof(*simple_data));
-    simple_data->data = TEST_DATA_MAGIC;
-    simple_data->enqueue_time.timestamp.tv_sec = 0;
-    simple_data->enqueue_time.timestamp.tv_nsec = 0;
+test_data** test_data_create(size_t cnt) {
+    test_data** simple_data = test_malloc(TEST_MODULE_DATA, sizeof(*simple_data));
+    for (size_t i = 0; i < cnt; i++) {
+        simple_data[i] = test_malloc(TEST_MODULE_DATA, sizeof(*simple_data[i]));
+        simple_data[i]->data = TEST_DATA_MAGIC;
+        simple_data[i]->enqueue_time.timestamp.tv_sec = 0;
+        simple_data[i]->enqueue_time.timestamp.tv_nsec = 0;
+    }
 
     return simple_data;
 }
 
-void test_data_destory(test_data* data) {
+void test_data_destory(test_data** data, size_t cnt) {
+    for (size_t i = 0; i < cnt; i++) {
+        test_free(TEST_MODULE_DATA, data[i]);
+    }
     test_free(TEST_MODULE_DATA, data);
 }
 
@@ -171,17 +168,18 @@ void* test_thread_producer_start(void* arg) {
         if (cfg->ring.workload == TEST_WORKLOAD_SIMPLE) {
             ret = test_exec_enqueue(q, exit_data->simple_data[0], &op_latency);
         } else {
-            test_data* data = test_data_create();
+            test_data** data = test_data_create(1);
             if (data == NULL) {
                 BBQ_ERR_LOG("malloc falied");
                 exit(-1);
             }
-            data->enqueue_time = test_clock_time_get();
-            data->data = TEST_DATA_MAGIC;
-            ret = test_exec_enqueue(q, data, &op_latency);
+            data[0]->enqueue_time = test_clock_time_get();
+            data[0]->data = TEST_DATA_MAGIC;
+            ret = test_exec_enqueue(q, data[0], &op_latency);
             if (ret != 0) {
-                test_free(TEST_MODULE_DATA, data);
+                test_free(TEST_MODULE_DATA, data[0]);
             }
+            test_free(TEST_MODULE_DATA, data);
             test_busy_loop(t_arg->busy_loop);
         }
 
