@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-06 10:56:19
+ * @LastEditTime: 2024-06-06 12:02:08
  * @Email: liuyu@geedgenetworks.com
  * @Describe: bbq（Block-based Bounded Queue）实现
  * 参考：https://www.usenix.org/system/files/atc22-wang-jiawei.pdf
@@ -299,6 +299,10 @@ int bbq_dequeue(bbq_queue_s *q, void *deq_data) {
 
 /* 将多个对象从一个环形队列ring取出，直到达到最大数量，或是出队失败 */
 uint32_t bbq_dequeue_burst(bbq_queue_s *q, void *obj_table, uint32_t n) {
+    if (q == NULL || obj_table == NULL) {
+        return BBQ_NULL_PTR;
+    }
+
     uint32_t cnt = 0;
     int ret = 0;
     void *obj = NULL;
@@ -321,6 +325,10 @@ uint32_t bbq_dequeue_burst(bbq_queue_s *q, void *obj_table, uint32_t n) {
 
 /* 尝试一次入队多个数据，直到达到最大数量，或是入队失败 */
 uint32_t bbq_enqueue_burst(bbq_queue_s *q, void *obj_table, size_t n, unsigned int flags) {
+    if (q == NULL || obj_table == NULL) {
+        return BBQ_NULL_PTR;
+    }
+
     uint32_t cnt = 0;
     void *obj = NULL;
 

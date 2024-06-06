@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-06 10:57:29
+ * @LastEditTime: 2024-06-06 12:10:26
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -118,30 +118,35 @@ void test_data_destory(test_data **data, size_t cnt) {
     test_free(TEST_MODULE_DATA, data);
 }
 
-uint32_t test_exec_enqueue(test_queue_s *q, test_data **data, size_t simple_data_cnt, test_time_metric *op_use_diff) {
-    int ret = 0;
+uint32_t test_exec_enqueue(test_queue_s *q, test_data **data, size_t burst_cnt, test_time_metric *op_use_diff) {
     uint32_t enqueue_cnt = 0;
     test_time_metric op_use_start = test_clock_time_get();
-    if (simple_data_cnt == 1) {
+    if (burst_cnt == 1) {
         if (q->enqueue_f(q->ring, data[0]) == 0) {
             enqueue_cnt = 1;
         }
     } else {
-        enqueue_cnt = q->enqueue_burst_f(q->ring, data, simple_data_cnt, BBQ_F_ARRAY_2D);
+        enqueue_cnt = q->enqueue_burst_f(q->ring, data, burst_cnt, BBQ_F_ARRAY_2D);
     }
     *op_use_diff = test_clock_time_sub(test_clock_time_get(), op_use_start);
 
     return enqueue_cnt;
 }
 
-int test_exec_dequeue(test_queue_s *q, void *obj, test_time_metric *op_use_diff) {
-    int ret = 0;
+uint32_t test_exec_dequeue(test_queue_s *q, test_data **data, size_t burst_cnt, test_time_metric *op_use_diff) {
+    uint32_t dequeue_cnt = 0;
 
     test_time_metric op_use_start = test_clock_time_get();
-    ret = q->dequeue_f(q->ring, obj);
+    if (burst_cnt == 1) {
+        if (q->dequeue_f(q->ring, &data[0]) == 0) {
+            dequeue_cnt = 1;
+        }
+    } else {
+        dequeue_cnt = q->dequeue_burst_f(q->ring, data, burst_cnt);
+    }
     *op_use_diff = test_clock_time_sub(test_clock_time_get(), op_use_start);
 
-    return ret;
+    return dequeue_cnt;
 }
 
 void *test_thread_producer_start(void *arg) {
@@ -212,7 +217,7 @@ void *test_thread_producer_start(void *arg) {
 }
 
 void *test_thread_consumer_start(void *arg) {
-    int ret = 0;
+    uint32_t deq_cnt = -1;
     uint64_t ok_cnt = 0;
     uint64_t run_times = 0;
     test_thread_arg_s *t_arg = (test_thread_arg_s *)arg;
@@ -225,50 +230,51 @@ void *test_thread_consumer_start(void *arg) {
     uint64_t op_err_latency_ns = 0;
     uint64_t data_error_cnt = 0;
     char thread_name[128] = {0};
+    test_data **deq_data = test_malloc(TEST_MODULE_DATA, sizeof(*deq_data) * cfg->ring.burst_cnt);
     snprintf(thread_name, sizeof(thread_name), "consumer:%x", exit_data->thread_id);
     prctl(PR_SET_NAME, thread_name);
 
     atomic_fetch_add(&cfg->run.thread_start, 1);
     test_wait_all_threads_ready(cfg);
 
-    usleep(100);
-
     exit_data->metric_start = test_clock_time_get();
+
+    uint32_t last_times = 5;
     while (true) {
         if ((cfg->run.deq_per_consumer > 0 && run_times >= cfg->run.deq_per_consumer) || (!cfg->run.running)) {
             // 控制次数的循环或运行时间到了,检查生产者是否全部退出，且队列被消费完了
-            if (ret && test_all_producer_exit(cfg)) {
+            if (deq_cnt == 0 && test_all_producer_exit(cfg) && (last_times-- <= 0)) {
                 break;
             }
         }
 
-        test_data *data = NULL;
+        deq_cnt = test_exec_dequeue(q, deq_data, cfg->ring.burst_cnt, &op_latency);
+        if (deq_cnt > 0) {
+            for (uint32_t i = 0; i < deq_cnt; i++) {
+                test_data *data = deq_data[i];
+                if (t_arg->cfg->ring.workload == TEST_WORKLOAD_SIMPLE) {
+                    if (data->data != TEST_DATA_MAGIC) {
+                        BBQ_ERR_LOG("the obtained data is not consistent with the expectation, expect:%u actual:%u", TEST_DATA_MAGIC, data->data);
+                        exit_data->data_error_cnt += 1;
+                    }
+                } else {
+                    test_time_metric latency = test_clock_time_sub(test_clock_time_get(), data->enqueue_time);
+                    if (test_clock_time_is_zero(&data->enqueue_time)) {
+                        BBQ_ERR_LOG("enqueue_time is 0");
+                        exit(-1);
+                    }
 
-        ret = test_exec_dequeue(q, &data, &op_latency);
-        if (ret == 0) {
-            if (t_arg->cfg->ring.workload == TEST_WORKLOAD_SIMPLE) {
-                if (data->data != TEST_DATA_MAGIC) {
-                    BBQ_ERR_LOG("the obtained data is not consistent with the expectation, expect:%u actual:%u", TEST_DATA_MAGIC, data->data);
-                    exit_data->data_error_cnt += 1;
-                }
-            } else {
-                test_time_metric latency = test_clock_time_sub(test_clock_time_get(), data->enqueue_time);
-                if (test_clock_time_is_zero(&data->enqueue_time)) {
-                    BBQ_ERR_LOG("enqueue_time is 0");
-                    exit(-1);
-                }
+                    if (data->data != TEST_DATA_MAGIC) {
+                        BBQ_ERR_LOG("the obtained data is not consistent with the expectation, expect:%u actual:%u", TEST_DATA_MAGIC, data->data);
+                        data_error_cnt += 1;
+                    }
 
-                if (data->data != TEST_DATA_MAGIC) {
-                    BBQ_ERR_LOG("the obtained data is not consistent with the expectation, expect:%u actual:%u", TEST_DATA_MAGIC, data->data);
-                    data_error_cnt += 1;
+                    latency_ns += test_clock_time_to_ns(&latency);
+                    test_free(TEST_MODULE_DATA, data);
+                    test_busy_loop(t_arg->busy_loop);
                 }
-
-                latency_ns += test_clock_time_to_ns(&latency);
-                test_free(TEST_MODULE_DATA, data);
-                test_busy_loop(t_arg->busy_loop);
             }
-
-            ok_cnt++;
+            ok_cnt += deq_cnt;
             op_ok_latency_ns += test_clock_time_to_ns(&op_latency);
         } else {
             op_err_latency_ns += test_clock_time_to_ns(&op_latency);
@@ -284,6 +290,8 @@ void *test_thread_consumer_start(void *arg) {
     exit_data->op_ok_latency_ns = op_ok_latency_ns;
     exit_data->op_err_latency_ns = op_err_latency_ns;
     exit_data->data_error_cnt = data_error_cnt;
+
+    test_free(TEST_MODULE_DATA, deq_data);
     BBQ_DBG_LOG("consumer-----> de_ok:%lu", ok_cnt);
     pthread_exit(exit_data);
 }
