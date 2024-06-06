@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-05 22:46:48
+ * @LastEditTime: 2024-06-05 23:35:02
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -110,7 +110,7 @@ int main(int argc, char* argv[]) {
         config = "/root/code/c/bbq-ly/tests/benchmark/config/compare/general/case1_simple_spsc.ini";
         ring_type = "dpdk";
         // ring_type = "bbq";
-        burst_cnt = 1;
+        burst_cnt = 100;
         BBQ_ERR_LOG("use default config, ringt_type:%s burst:%u config:%s argc:%d", ring_type, burst_cnt, config, argc);
     }
 

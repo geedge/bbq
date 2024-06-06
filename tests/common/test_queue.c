@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-05 23:13:56
+ * @LastEditTime: 2024-06-05 23:33:38
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -100,7 +100,7 @@ test_exit_data* test_exit_data_destory(test_exit_data* data) {
 }
 
 test_data** test_data_create(size_t cnt) {
-    test_data** simple_data = test_malloc(TEST_MODULE_DATA, sizeof(*simple_data));
+    test_data** simple_data = test_malloc(TEST_MODULE_DATA, sizeof(*simple_data) * cnt);
     for (size_t i = 0; i < cnt; i++) {
         simple_data[i] = test_malloc(TEST_MODULE_DATA, sizeof(*simple_data[i]));
         simple_data[i]->data = TEST_DATA_MAGIC;
@@ -118,16 +118,20 @@ void test_data_destory(test_data** data, size_t cnt) {
     test_free(TEST_MODULE_DATA, data);
 }
 
-int test_exec_enqueue(test_queue_s* q, test_data** data, size_t simple_data_cnt, test_time_metric* op_use_diff) {
+uint32_t test_exec_enqueue(test_queue_s* q, test_data** data, size_t simple_data_cnt, test_time_metric* op_use_diff) {
     int ret = 0;
-
+    uint32_t enqueue_cnt = 0;
     test_time_metric op_use_start = test_clock_time_get();
     if (simple_data_cnt == 1) {
-        ret = q->enqueue_f(q->ring, data[0]);
+        if (q->enqueue_f(q->ring, data[0]) == 0) {
+            enqueue_cnt = 1;
+        }
+    } else {
+        enqueue_cnt = q->enqueue_burst_f(q->ring, data, simple_data_cnt, BBQ_F_ARRAY_2D);
     }
     *op_use_diff = test_clock_time_sub(test_clock_time_get(), op_use_start);
 
-    return ret;
+    return enqueue_cnt;
 }
 
 int test_exec_dequeue(test_queue_s* q, void* obj, test_time_metric* op_use_diff) {
@@ -142,6 +146,7 @@ int test_exec_dequeue(test_queue_s* q, void* obj, test_time_metric* op_use_diff)
 
 void* test_thread_producer_start(void* arg) {
     int ret = 0;
+    uint32_t enqueue_cnt = 0;
     uint64_t ok_cnt = 0;
     uint64_t run_times = 0;
     test_thread_arg_s* t_arg = (test_thread_arg_s*)arg;
@@ -168,7 +173,7 @@ void* test_thread_producer_start(void* arg) {
         }
 
         if (cfg->ring.workload == TEST_WORKLOAD_SIMPLE) {
-            ret = test_exec_enqueue(q, exit_data->simple_data, exit_data->simple_data_cnt, &op_latency);
+            enqueue_cnt = test_exec_enqueue(q, exit_data->simple_data, exit_data->simple_data_cnt, &op_latency);
         } else {
             test_data** data = test_data_create(1);
             if (data == NULL) {
@@ -177,16 +182,16 @@ void* test_thread_producer_start(void* arg) {
             }
             data[0]->enqueue_time = test_clock_time_get();
             data[0]->data = TEST_DATA_MAGIC;
-            ret = test_exec_enqueue(q, data, 1, &op_latency);
-            if (ret != 0) {
+            enqueue_cnt = test_exec_enqueue(q, data, 1, &op_latency);
+            if (enqueue_cnt != 1) {
                 test_free(TEST_MODULE_DATA, data[0]);
             }
             test_free(TEST_MODULE_DATA, data);
             test_busy_loop(t_arg->busy_loop);
         }
 
-        if (ret == 0) {
-            ok_cnt++;
+        if (enqueue_cnt > 0) {
+            ok_cnt += enqueue_cnt;
             op_ok_latency_ns += test_clock_time_to_ns(&op_latency);
         } else {
             op_err_latency_ns += test_clock_time_to_ns(&op_latency);
