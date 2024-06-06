@@ -155,7 +155,7 @@ uint64_t test_clock_time_to_ns(test_time_metric *metric) {
     return metric->timestamp.tv_nsec + metric->timestamp.tv_sec * 1000 * 1000 * 1000;
 }
 
-uint64_t test_clock_time_to_double(test_time_metric *metric) {
+double test_clock_time_to_double(test_time_metric *metric) {
     return metric->timestamp.tv_sec +
            metric->timestamp.tv_nsec * 1.0 / 1000 / 1000 / 1000;
 }

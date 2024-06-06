@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-05 18:05:17
+ * @LastEditTime: 2024-06-06 10:57:22
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -106,7 +106,7 @@ extern bool test_clock_time_is_zero(test_time_metric *metric);
 extern bool test_timespec_is_after(const struct timespec *a, const struct timespec *b);
 extern char *test_ring_type_enum2str(test_ring_type ring_type);
 extern uint64_t test_clock_time_to_ns(test_time_metric *metric);
-extern uint64_t test_clock_time_to_double(test_time_metric *metric);
+extern double test_clock_time_to_double(test_time_metric *metric);
 extern void *test_malloc(test_module_e module, size_t size);
 extern void *test_calloc(test_module_e module, size_t size);
 extern void test_free(test_module_e module, void *ptr);
