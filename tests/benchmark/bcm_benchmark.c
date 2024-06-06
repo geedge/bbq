@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-06 10:52:56
+ * @LastEditTime: 2024-06-06 18:28:48
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -107,9 +107,10 @@ int main(int argc, char *argv[]) {
             burst_cnt = 1;
         }
     } else {
-        config = "/root/code/c/bbq-ly/tests/benchmark/config/compare/general/case5_complex_mpsc.ini";
+        config = "/root/code/c/bbq-ly/tests/benchmark/config/compare/general/case8_simple_mpmc.ini";
+        ring_type = "rmind";
         // ring_type = "dpdk";
-        ring_type = "bbq";
+        // ring_type = "bbq";
         burst_cnt = 100;
         BBQ_ERR_LOG("use default config, ringt_type:%s burst:%u config:%s argc:%d", ring_type, burst_cnt, config, argc);
     }

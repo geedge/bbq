@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-06 12:07:11
+ * @LastEditTime: 2024-06-06 16:39:11
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -15,23 +15,24 @@
 typedef void (*test_ring_free_f)(void *ring);
 typedef int (*test_ring_enqueue_f)(void *ring, void *obj);
 typedef int (*test_ring_dequeue_f)(void *ring, void *obj);
-typedef uint32_t (*test_enqueue_burst_f)(void *ring, void *obj_table, size_t n, unsigned int flags);
+typedef uint32_t (*test_enqueue_burst_f)(void *ring, void *obj_table, size_t n, unsigned int flags, uint16_t thread_idx);
 typedef uint32_t (*test_dequeue_burst_f)(void *ring, void *obj_table, uint32_t n);
 typedef bool (*test_ring_empty_f)(void *ring);
 
 typedef struct {
+    void *ring;
     test_ring_type ring_type;
     test_ring_free_f ring_free_f;
     test_ring_enqueue_f enqueue_f;
     test_ring_dequeue_f dequeue_f;
     test_enqueue_burst_f enqueue_burst_f;
     test_dequeue_burst_f dequeue_burst_f;
-    void *ring;
 } test_queue_s;
 
 typedef struct {
     int core;
-    uint32_t busy_loop; // 忙循环次数
+    uint16_t thread_idx; // 线程索引，不是pthread_id
+    uint32_t busy_loop;  // 忙循环次数
     test_thread_type_e ttype;
     test_cfg *cfg;
     test_queue_s *q;
@@ -79,24 +80,22 @@ typedef struct {
 
 extern void test_threads_destory(pthread_t *threads);
 extern pthread_t *test_threads_create(test_cfg *cfg, test_queue_s *q);
-extern pthread_t *test_one_thread_create(test_cfg *cfg, test_queue_s *q, test_thread_type_e ttype, int core, pthread_t *thread);
+extern pthread_t *test_one_thread_create(test_cfg *cfg, test_queue_s *q, test_thread_type_e ttype, int core, uint16_t thread_id, pthread_t *thread);
 extern void test_check_run_time(test_cfg *cfg);
 extern void *test_thread_consumer_start(void *arg);
 extern void *test_thread_producer_start(void *arg);
 extern uint32_t test_exec_dequeue(test_queue_s *q, test_data **data, size_t burst_cnt, test_time_metric *op_use_diff);
-extern uint32_t test_exec_enqueue(test_queue_s *q, test_data **data, size_t burst_cnt, test_time_metric *op_use_diff);
+extern uint32_t test_exec_enqueue(test_queue_s *q, test_data **data, size_t burst_cnt, test_time_metric *op_use_diff, uint16_t thread_idx);
 extern test_exit_data *test_exit_data_destory(test_exit_data *data);
 extern test_exit_data *test_exit_data_create(test_thread_arg_s *t_arg);
 extern void test_wait_all_threads_ready(test_cfg *cfg);
 extern void test_queue_destory(test_queue_s *q);
 extern int test_queue_init_bbq(test_cfg *cfg, test_queue_s *q);
 extern void test_merge_all_data(test_exit_data **exit_data, uint32_t thread_cnt, test_merge_s *merge);
-
 extern uint64_t bbq_idx(bbq_queue_s *q, uint64_t x);
 extern uint64_t bbq_off(bbq_queue_s *q, uint64_t x);
 extern uint64_t bbq_head_vsn(bbq_queue_s *q, uint64_t x);
 extern uint64_t bbq_cur_vsn(bbq_queue_s *q, uint64_t x);
-
 extern test_data **test_data_create(size_t cnt);
 extern void test_data_destory(test_data **data, size_t cnt);
 #endif

@@ -1,12 +1,12 @@
 #!/bin/bash
 ###
 # @Author: liuyu
-# @LastEditTime: 2024-06-05 18:43:28
+# @LastEditTime: 2024-06-06 14:59:48
 # @Email: liuyu@geedgenetworks.com
 # @Describe: TODO
 ###
 
-ring_type_arr=("bbq" "dpdk")
+ring_type_arr=("bbq" "dpdk" "rmind")
 
 # 检查参数数量
 if [ "$#" -ne 4 ]; then

@@ -1,7 +1,7 @@
 /*
  * @Description: 描述信息
  * @Date: 2024-05-25 10:55:48
- * @LastEditTime: 2024-06-05 18:45:47
+ * @LastEditTime: 2024-06-06 18:32:47
  */
 
 #include "test_mix.h"
@@ -137,6 +137,19 @@ int test_load_config(const char *config, const char *ring_type, uint32_t burst_c
 
     BBQ_INFO_LOG("ring_type:%s(%u)", ring_type, cfg->ring.ring_type);
     BBQ_INFO_LOG("burst_cnt:%u", burst_cnt);
+
+    if (cfg->ring.ring_type == TEST_RING_TYPE_RMIND) {
+        // rmind仅支持1个消费者，仅支持burst方式
+        if (cfg->ring.consumer_cnt > 1) {
+            BBQ_ERR_LOG("ring type:%s only support single consumer", TEST_RING_TYPE_RMIND_STR);
+            return -1;
+        }
+
+        if (cfg->ring.burst_cnt <= 1) {
+            BBQ_ERR_LOG("ring type:%s only support burst_cnt > 1", TEST_RING_TYPE_RMIND_STR);
+            return -1;
+        }
+    }
     // 释放dictionary对象
     iniparser_freedict(ini);
     return 0;
@@ -206,6 +219,7 @@ test_workload_e test_workload_str2enum(const char *workload) {
 char *ring_type_map[TEST_RING_TYPE_MAX] = {
     [TEST_RING_TYPE_BBQ] = TEST_RING_TYPE_BBQ_STR,
     [TEST_RING_TYPE_DPDK] = TEST_RING_TYPE_DPDK_STR,
+    [TEST_RING_TYPE_RMIND] = TEST_RING_TYPE_RMIND_STR,
 };
 
 test_ring_type test_ring_type_str2enum(const char *ring_type) {
@@ -213,6 +227,8 @@ test_ring_type test_ring_type_str2enum(const char *ring_type) {
         return TEST_RING_TYPE_BBQ;
     } else if (strcmp(ring_type, TEST_RING_TYPE_DPDK_STR) == 0) {
         return TEST_RING_TYPE_DPDK;
+    } else if (strcmp(ring_type, TEST_RING_TYPE_RMIND_STR) == 0) {
+        return TEST_RING_TYPE_RMIND;
     }
 
     return TEST_RING_TYPE_MAX;

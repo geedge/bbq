@@ -1,6 +1,6 @@
 /*
  * @Author: liuyu
- * @LastEditTime: 2024-06-06 10:57:22
+ * @LastEditTime: 2024-06-06 14:23:24
  * @Email: liuyu@geedgenetworks.com
  * @Describe: TODO
  */
@@ -43,9 +43,11 @@ typedef enum {
 
 #define TEST_RING_TYPE_BBQ_STR "bbq"
 #define TEST_RING_TYPE_DPDK_STR "dpdk"
+#define TEST_RING_TYPE_RMIND_STR "rmind"
 typedef enum {
     TEST_RING_TYPE_BBQ,
     TEST_RING_TYPE_DPDK,
+    TEST_RING_TYPE_RMIND,
     TEST_RING_TYPE_MAX,
 } test_ring_type;
 
@@ -94,6 +96,7 @@ typedef enum {
     TEST_MODULE_DATA,
     TEST_MODULE_BCM,
     TEST_MODULE_TABLE,
+    TEST_MODULE_RMIND,
     TEST_MODULE_MAX,
 } test_module_e;
 
